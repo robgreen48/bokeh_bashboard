@@ -7,7 +7,7 @@ from bokeh.plotting import figure, show
 from bokeh.layouts import row, widgetbox
 from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 from bokeh.palettes import brewer
-from bokeh.models.widgets import Select, Div
+from bokeh.models.widgets import Select, Div, Panel, Tabs
 
 #  Process the num-active csv so that it's in the right format to plot
 
@@ -97,6 +97,8 @@ width=200, height=100)
 
 # Set up layouts and add to document
 inputs = widgetbox(sel_country, a_number)
-
-curdoc().add_root(row(inputs, growth_p, ratio_p, width=1200))
+layout = row(inputs, growth_p, ratio_p, width=1200)
+tab1 = Panel(child=layout, title="Growth")
+tabs = [tab1]
+curdoc().add_root(Tabs(tabs=tabs))
 curdoc().title = "Membership Growth & Ratio"
