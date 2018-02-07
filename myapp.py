@@ -11,7 +11,7 @@ from bokeh.models.widgets import Select, Div
 
 #  Process the num-active csv so that it's in the right format to plot
 
-df = pd.read_csv('/data_files/num-active.csv', parse_dates=(['period_end']))
+df = pd.read_csv('data_files/num-active.csv', parse_dates=(['period_end']))
 df = (df.groupby(['period_end', 'country', 'membership_type'])['num_active']
         .sum()
         .unstack() # unstack the membership_type column
@@ -23,7 +23,7 @@ df['country_cat'] = [x if x in top_markets else 'ROW' for x in df['country']] # 
 
 df.fillna(0, inplace=True) # replace NaN with 0
 
-df['all_members'] = df.combined + df.homeowner + df.housesitter
+df[['homeowner', 'housesitter', 'combined']] = df[['homeowner', 'housesitter', 'combined']].astype(int)
 
 # Set an inital state for plotting all member data
 init = df.groupby('period_end')[['homeowner', 'housesitter', 'combined']].sum().reset_index()
@@ -75,11 +75,12 @@ def update(attr, old, new):
         x=data.period_end,
         y=data.housesitter / data.homeowner)
 
+    last_count = (growth_source.data['ys'][0].shape[0]) - 1
     owner_count = (growth_source.data['ys'][0][last_count]).astype('str')
     sitter_count = (growth_source.data['ys'][1][last_count]).astype('str')
     combined_count = (growth_source.data['ys'][2][last_count]).astype('str')
 
-    a_number.text = owner_count + " Owners, " + sitter_count + " Sitters,"  + combined_count + " Combined"
+    a_number.text = "<ul><li>" + owner_count + " Owners</li>" + "<li>" + sitter_count + " Sitters </li>"  + "<li>" + combined_count + " Combined</li></ul>"
 
 # Select box for country
 country_options = ["All", "United Kingdom", "United States", "Australia", "Canada", "New Zealand", "ROW"]
@@ -91,7 +92,7 @@ owner_count = (growth_source.data['ys'][0][last_count]).astype('str')
 sitter_count = (growth_source.data['ys'][1][last_count]).astype('str')
 combined_count = (growth_source.data['ys'][2][last_count]).astype('str')
 
-a_number = Div(text=(owner_count + " Owners, " + sitter_count + " Sitters,"  + combined_count + " Combined"),
+a_number = Div(text=("<ul><li>" + owner_count + " Owners</li>" + "<li>" + sitter_count + " Sitters </li>"  + "<li>" + combined_count + " Combined</li></ul>"),
 width=200, height=100)
 
 # Set up layouts and add to document
