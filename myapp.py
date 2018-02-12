@@ -249,6 +249,8 @@ relevant_assignments = (
     assignments_impr[(assignments_impr.time_into_membership <= datetime.timedelta(days=90)) 
                      & (assignments_impr.time_into_membership >= datetime.timedelta(days=0))]
 )
+relevant_assignments['country_cat'] = [x if x in top_markets else 'ROW' for x in relevant_assignments['billing_country']]
+
 
 num_of_assignments = relevant_assignments['user_id'].value_counts()
 num_confirmed_sitters = relevant_assignments.groupby('user_id')['is_assignment_filled'].sum()
@@ -260,18 +262,14 @@ owners['nb_confirmed_sitters'] = num_confirmed_sitters
 owners['nb_applications'] = num_apps
 owners['is_successful'] = owners.nb_confirmed_sitters > 0
 owners['nb_apps_per_assignment'] = owners.nb_applications / owners.nb_assignments
+owners['country_cat'] = [x if x in top_markets else 'ROW' for x in owners['billing_country']]
 owners = owners.fillna(0)
 owners.reset_index(inplace=True)
 owners.set_index('fst_start_date', inplace=True)
 
-num_owners = owners.groupby('fst_start_date')['user_id'].count()
-num_owners_inactive = owners[owners.nb_assignments == 0].groupby('fst_start_date')['user_id'].count()
-owner_activity = pd.concat([num_owners, num_owners_inactive], axis=1)
-owner_activity.columns = ['num_owners', 'num_inactive']
+# Create country_cat column for owners and relevant_assignments tables
 
-owner_activity['percent_inactive'] = owner_activity.num_inactive / owner_activity.num_owners
-
-def create_owner_onboarding_source(owner_data, owner_activity_data, assignment_data):
+def create_owner_onboarding_source(owner_data, assignment_data):
 
     sampled_owners = owner_data.loc[REPORT_START:REPORT_END].resample('M').agg({
         'nb_assignments': np.sum,
@@ -279,7 +277,14 @@ def create_owner_onboarding_source(owner_data, owner_activity_data, assignment_d
         }
     )
     sampled_active_owners = owner_data[owner_data.nb_assignments > 0].loc[REPORT_START:REPORT_END].resample('M').mean()
-    sampled_activity = owner_activity_data.loc[REPORT_START:REPORT_END].resample('M').agg({
+
+    num_owners = owner_data.groupby('fst_start_date')['user_id'].count()
+    num_owners_inactive = owner_data[owner_data.nb_assignments == 0].groupby('fst_start_date')['user_id'].count()
+    owner_activity = pd.concat([num_owners, num_owners_inactive], axis=1)
+    owner_activity.columns = ['num_owners', 'num_inactive']
+    owner_activity['percent_inactive'] = owner_activity.num_inactive / owner_activity.num_owners
+
+    sampled_activity = owner_activity.loc[REPORT_START:REPORT_END].resample('M').agg({
         'num_owners': np.sum,
         'percent_inactive': np.mean
         }
@@ -297,8 +302,22 @@ def create_owner_onboarding_source(owner_data, owner_activity_data, assignment_d
 
     return source
 
-owner_onboarding_source = ColumnDataSource(data=create_owner_onboarding_source(owners, owner_activity, relevant_assignments))
+owner_onboarding_source = ColumnDataSource(data=create_owner_onboarding_source(owners, relevant_assignments))
 
+# Callback to update sitter onboarding plots
+def update_owner_onboarding(attr, old, new):
+
+    country = sel_country3.value
+
+    if country == 'All':
+        oo_owner_data = owners
+        oo_assignment_data = relevant_assignments
+    else:
+        oo_owner_data = owners[owners.country_cat == country]
+        oo_assignment_data = relevant_assignments[relevant_assignments.country_cat == country]
+    
+    # Update the source data
+    owner_onboarding_source.data = create_owner_onboarding_source(oo_owner_data, oo_assignment_data)
 
 # Create figure for owner assignments graph
 owner_assignments_p = figure(title="New Owner Assignments", plot_height=300, plot_width=400, x_axis_type='datetime')
@@ -327,9 +346,12 @@ confirmation_rate_p = figure(title="New Owner Confirmation Rate", plot_height=30
 confirmation_rate_r = confirmation_rate_p.line(x='x', y='confirmation_rate', source=owner_onboarding_source, color="#2222aa", line_width=1)
 confirmation_rate_p.yaxis.formatter = NumeralTickFormatter(format="0%")
 
-#oo_inputs = widgetbox()
+sel_country3 = Select(title="Country:", options=country_options, value="All")
+sel_country3.on_change('value', update_owner_onboarding)
 
-oo_layout = gridplot([owner_assignments_p, owner_apps_p, owner_success_p, owner_numbers_p, owner_inactive_p, confirmation_rate_p], ncols=3)
+oo_inputs = widgetbox(sel_country3)
+
+oo_layout = gridplot([oo_inputs, owner_assignments_p, owner_apps_p, owner_success_p, owner_numbers_p, owner_inactive_p, confirmation_rate_p], ncols=3)
 tab3 = Panel(child=oo_layout, title="Owner Onboarding")
 
 # Layout of tabs for the whole dashboard
