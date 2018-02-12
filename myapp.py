@@ -140,58 +140,96 @@ onboarding_sitters.set_index('user_id', inplace=True)
 onboarding_sitters['nb_applications'] = num_of_apps
 onboarding_sitters['confirmed_sits'] = num_confirmed
 onboarding_sitters['is_successful'] = onboarding_sitters.confirmed_sits > 0
+onboarding_sitters['country_cat'] = [x if x in top_markets else 'ROW' for x in onboarding_sitters['billing_country']]
 onboarding_sitters.reset_index(inplace=True)
 onboarding_sitters.set_index('fst_start_date', inplace=True)
 onboarding_sitters = onboarding_sitters.fillna(0)
-sampled_sitters = onboarding_sitters.loc[REPORT_START:REPORT_END].resample('M').agg({
+
+
+def create_sitter_onboarding_source(data):
+
+    sampled_sitters = data.loc[REPORT_START:REPORT_END].resample('M').agg({
     'nb_applications': np.sum,
     'confirmed_sits': np.mean,
     'is_successful': np.mean})
 
-# Member activity data
-num_sitters = onboarding_sitters.reset_index().groupby('fst_start_date')['user_id'].count()
-num_inactive = onboarding_sitters[onboarding_sitters.nb_applications == 0].groupby('fst_start_date')['user_id'].count()
-activity = pd.concat([num_sitters, num_inactive], axis=1)
-activity.columns = ['num_sitters', 'num_inactive']
-activity['percent_inactive'] = activity.num_inactive / activity.num_sitters
-activity = activity.loc[REPORT_START:REPORT_END].resample('M').agg({
+    source = dict(
+        x=sampled_sitters.index,
+        nb_applications=sampled_sitters.nb_applications,
+        confirmed_sits=sampled_sitters.confirmed_sits,
+        is_successful=sampled_sitters.is_successful)
+
+    return source
+
+sitter_onboarding_source = ColumnDataSource(data=create_sitter_onboarding_source(onboarding_sitters))
+
+
+def create_sitter_inactivity_source(data):
+
+    # Take the onboarding sitters data and manipulate for the inactivity metrics
+    num_sitters = data.reset_index().groupby('fst_start_date')['user_id'].count()
+    num_inactive = data[data.nb_applications == 0].groupby('fst_start_date')['user_id'].count()
+    activity = pd.concat([num_sitters, num_inactive], axis=1)
+    activity.columns = ['num_sitters', 'num_inactive']
+    activity['percent_inactive'] = activity.num_inactive / activity.num_sitters
+
+    sampled_activity = activity.loc[REPORT_START:REPORT_END].resample('M').agg({
     'num_sitters': np.sum,
     'percent_inactive': np.mean})
 
-sitter_onboarding_source = ColumnDataSource(data=dict(
-    x=sampled_sitters.index,
-    nb_applications=sampled_sitters.nb_applications,
-    confirmed_sits=sampled_sitters.confirmed_sits,
-    is_successful=sampled_sitters.is_successful))
+    source = dict(
+        x=sampled_activity.index,
+        inactive=sampled_activity.percent_inactive,
+        num_sitters=sampled_activity.num_sitters)
+
+    return source
+
+inactivity_source = ColumnDataSource(data=create_sitter_inactivity_source(onboarding_sitters))
+
+
+# Callback to update sitter onboarding plots
+def update_sitter_onboarding(attr, old, new):
+
+    country = sel_country2.value
+
+    if country == 'All':
+        so_data = onboarding_sitters
+    else:
+        so_data = onboarding_sitters[onboarding_sitters.country_cat == country]
+    
+    # Update the source data
+    sitter_onboarding_source.data = create_sitter_onboarding_source(so_data)
+    inactivity_source.data = create_sitter_inactivity_source(so_data)
+
 
 # Create figure for sitter apps graph
-sitter_apps_p = figure(title="New Sitter Applications", plot_height=400, plot_width=400, x_axis_type='datetime')
+sitter_apps_p = figure(title="New Sitter Applications", plot_height=300, plot_width=400, x_axis_type='datetime')
 sitter_apps_r = sitter_apps_p.line(x='x', y='nb_applications', source=sitter_onboarding_source, color="#2222aa", line_width=1)
 
 # Create figure for sitter confirmations graph
-sitter_confirmed_p = figure(title="New Sitter Confirmations", plot_height=400, plot_width=400, x_axis_type='datetime')
+sitter_confirmed_p = figure(title="New Sitter Confirmations", plot_height=300, plot_width=400, x_axis_type='datetime')
 sitter_confirmed_r = sitter_confirmed_p.line(x='x', y='confirmed_sits', source=sitter_onboarding_source, color="#2222aa", line_width=1)
 
 # Create figure for sitter success graph
-sitter_success_p = figure(title="New Sitter Success", plot_height=400, plot_width=400, x_axis_type='datetime')
+sitter_success_p = figure(title="New Sitter Success", plot_height=300, plot_width=400, x_axis_type='datetime')
 sitter_success_r = sitter_success_p.line(x='x', y='is_successful', source=sitter_onboarding_source, color="#2222aa", line_width=1)
 sitter_success_p.yaxis.formatter = NumeralTickFormatter(format="0%")
 
-inactivity_source = ColumnDataSource(data=dict(
-    x=activity.index,
-    inactive=activity.percent_inactive,
-    num_sitters=activity.num_sitters))
-
 # Create figure for inactivity graph
-sitter_inactivity_p = figure(title="New Sitter Inactivity Levels", plot_height=400, plot_width=400, x_axis_type='datetime')
+sitter_inactivity_p = figure(title="New Sitter Inactivity Levels", plot_height=300, plot_width=400, x_axis_type='datetime')
 sitter_inactivity_r = sitter_inactivity_p.line(x='x', y='inactive', source=inactivity_source, color="#2222aa", line_width=1)
 sitter_inactivity_p.yaxis.formatter = NumeralTickFormatter(format="0%")
 
 # Create figure for number of sitters graph
-sitter_numbers_p = figure(title="New Sitter Numbers", plot_height=400, plot_width=400, x_axis_type='datetime')
+sitter_numbers_p = figure(title="New Sitter Numbers", plot_height=300, plot_width=400, x_axis_type='datetime')
 sitter_numbers_r = sitter_numbers_p.line(x='x', y='num_sitters', source=inactivity_source, color="#2222aa", line_width=1)
 
-sitter_onb_layout = gridplot([sitter_inactivity_p, sitter_apps_p, sitter_confirmed_p, sitter_numbers_p, sitter_success_p], ncols=3)
+sel_country2 = Select(title="Country:", options=country_options, value="All")
+sel_country2.on_change('value', update_sitter_onboarding)
+
+so_inputs = widgetbox(sel_country2)
+
+sitter_onb_layout = gridplot([so_inputs, sitter_inactivity_p, sitter_apps_p, sitter_confirmed_p, sitter_numbers_p, sitter_success_p], ncols=3)
 tab2 = Panel(child=sitter_onb_layout, title="Sitter Onboarding")
 # additional tabs tab2, tab3....
 
