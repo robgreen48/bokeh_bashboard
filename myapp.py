@@ -105,7 +105,7 @@ a_number = Div(text=generate_counts_html(growth_source), width=200, height=100)
 # Set up layouts and add to tab1
 growth_inputs = widgetbox(sel_country, a_number)
 growth_layout = row(growth_inputs, growth_p, ratio_p, width=1200)
-tab1 = Panel(child=growth_layout, title="Growth")
+tab1 = Panel(child=growth_layout, title="Membership Growth")
 
 ###
 ###
@@ -173,7 +173,7 @@ def create_sitter_onboarding_source(data):
         nb_applications=sampled_sitters.nb_applications,
         confirmed_sits=sampled_sitters.confirmed_sits,
         is_successful=sampled_sitters.is_successful,
-        inactive=sampled_activity.percent_inactive,
+        percent_inactive=sampled_activity.percent_inactive,
         num_sitters=sampled_activity.num_sitters)
 
     return source
@@ -194,35 +194,30 @@ def update_sitter_onboarding(attr, old, new):
     # Update the source data
     sitter_onboarding_source.data = create_sitter_onboarding_source(so_data)
 
+so_plots_title_map = {
+    'nb_applications': 'New Sitter Applications',
+    'confirmed_sits': 'Confirmed Sits',
+    'is_successful': 'New Sitter Success',
+    'percent_inactive': 'New Sitter Inactivity',
+    'num_sitters': 'Number Of New Sitters'}
 
-# Create figure for sitter apps graph
-sitter_apps_p = figure(title="New Sitter Applications", plot_height=300, plot_width=400, x_axis_type='datetime')
-sitter_apps_r = sitter_apps_p.line(x='x', y='nb_applications', source=sitter_onboarding_source, color="#2222aa", line_width=1)
+so_plots = []
 
-# Create figure for sitter confirmations graph
-sitter_confirmed_p = figure(title="New Sitter Confirmations", plot_height=300, plot_width=400, x_axis_type='datetime')
-sitter_confirmed_r = sitter_confirmed_p.line(x='x', y='confirmed_sits', source=sitter_onboarding_source, color="#2222aa", line_width=1)
+for c, col in enumerate(['nb_applications', 'confirmed_sits', 'is_successful', 'percent_inactive', 'num_sitters']):
+    fig = figure(title=so_plots_title_map[col], plot_height=300, plot_width=400, x_axis_type='datetime')
+    fig.line(x='x', y=col, source=sitter_onboarding_source, color=brewer['Dark2'][5][c], line_width=1)
+    so_plots.append(fig)
 
-# Create figure for sitter success graph
-sitter_success_p = figure(title="New Sitter Success", plot_height=300, plot_width=400, x_axis_type='datetime')
-sitter_success_r = sitter_success_p.line(x='x', y='is_successful', source=sitter_onboarding_source, color="#2222aa", line_width=1)
-sitter_success_p.yaxis.formatter = NumeralTickFormatter(format="0%")
-
-# Create figure for inactivity graph
-sitter_inactivity_p = figure(title="New Sitter Inactivity Levels", plot_height=300, plot_width=400, x_axis_type='datetime')
-sitter_inactivity_r = sitter_inactivity_p.line(x='x', y='inactive', source=sitter_onboarding_source, color="#2222aa", line_width=1)
-sitter_inactivity_p.yaxis.formatter = NumeralTickFormatter(format="0%")
-
-# Create figure for number of sitters graph
-sitter_numbers_p = figure(title="New Sitter Numbers", plot_height=300, plot_width=400, x_axis_type='datetime')
-sitter_numbers_r = sitter_numbers_p.line(x='x', y='num_sitters', source=sitter_onboarding_source, color="#2222aa", line_width=1)
+so_plots[2].yaxis.formatter = NumeralTickFormatter(format="0%")
+so_plots[3].yaxis.formatter = NumeralTickFormatter(format="0%")
 
 sel_country2 = Select(title="Country:", options=country_options, value="All")
 sel_country2.on_change('value', update_sitter_onboarding)
 
 so_inputs = widgetbox(sel_country2)
 
-sitter_onb_layout = gridplot([so_inputs, sitter_inactivity_p, sitter_apps_p, sitter_confirmed_p, sitter_numbers_p, sitter_success_p], ncols=3)
+# sitter_onb_layout = gridplot([so_inputs, sitter_inactivity_p, sitter_apps_p, sitter_confirmed_p, sitter_numbers_p, sitter_success_p], ncols=3)
+sitter_onb_layout = gridplot([so_inputs] + so_plots, ncols=3)
 tab2 = Panel(child=sitter_onb_layout, title="Sitter Onboarding")
 # additional tabs tab2, tab3....
 
@@ -248,7 +243,7 @@ assignments_impr['time_into_membership'] = assignments_impr.created_date - assig
 relevant_assignments = (
     assignments_impr[(assignments_impr.time_into_membership <= datetime.timedelta(days=90)) 
                      & (assignments_impr.time_into_membership >= datetime.timedelta(days=0))]
-)
+).copy()
 relevant_assignments['country_cat'] = [x if x in top_markets else 'ROW' for x in relevant_assignments['billing_country']]
 
 
@@ -267,7 +262,6 @@ owners = owners.fillna(0)
 owners.reset_index(inplace=True)
 owners.set_index('fst_start_date', inplace=True)
 
-# Create country_cat column for owners and relevant_assignments tables
 
 def create_owner_onboarding_source(owner_data, assignment_data):
 
@@ -319,39 +313,31 @@ def update_owner_onboarding(attr, old, new):
     # Update the source data
     owner_onboarding_source.data = create_owner_onboarding_source(oo_owner_data, oo_assignment_data)
 
-# Create figure for owner assignments graph
-owner_assignments_p = figure(title="New Owner Assignments", plot_height=300, plot_width=400, x_axis_type='datetime')
-owner_assignments_r = owner_assignments_p.line(x='x', y='nb_assignments', source=owner_onboarding_source, color="#2222aa", line_width=1)
+oo_plots_title_map = {
+    'nb_assignments': 'New Owner Assignments',
+    'nb_apps_per_assignment': 'New Owner Applications Per Assignment',
+    'is_successful': 'New Owner Success',
+    'percent_inactive': 'New Owner Inactivity',
+    'nb_owners': 'Number Of New Owners',
+    'confirmation_rate': 'New Owner Confirmation Rate'}
 
-# Create figure for owner apps per assignment graph
-owner_apps_p = figure(title="Applications To New Owner Assignments", plot_height=300, plot_width=400, x_axis_type='datetime')
-owner_apps_r = owner_apps_p.line(x='x', y='nb_apps_per_assignment', source=owner_onboarding_source, color="#2222aa", line_width=1)
+oo_plots = []
 
-# Create figure for owner success graph
-owner_success_p = figure(title="New Owner Success", plot_height=300, plot_width=400, x_axis_type='datetime')
-owner_success_r = owner_success_p.line(x='x', y='is_successful', source=owner_onboarding_source, color="#2222aa", line_width=1)
-owner_success_p.yaxis.formatter = NumeralTickFormatter(format="0%")
+for c, col in enumerate(['nb_assignments', 'nb_apps_per_assignment', 'is_successful', 'percent_inactive', 'nb_owners', 'confirmation_rate']):
+    fig = figure(title=oo_plots_title_map[col], plot_height=300, plot_width=400, x_axis_type='datetime')
+    fig.line(x='x', y=col, source=owner_onboarding_source, color=brewer['Dark2'][6][c], line_width=1)
+    oo_plots.append(fig)
 
-# Create figure for owner numbers graph
-owner_numbers_p = figure(title="New Owner Numbers", plot_height=300, plot_width=400, x_axis_type='datetime')
-owner_numbers_r = owner_numbers_p.line(x='x', y='nb_owners', source=owner_onboarding_source, color="#2222aa", line_width=1)
-
-# Create figure for owner inactivity graph
-owner_inactive_p = figure(title="New Owner Inactivity", plot_height=300, plot_width=400, x_axis_type='datetime')
-owner_inactive_r = owner_inactive_p.line(x='x', y='percent_inactive', source=owner_onboarding_source, color="#2222aa", line_width=1)
-owner_inactive_p.yaxis.formatter = NumeralTickFormatter(format="0%")
-
-# Create figure for confirmation rate graph
-confirmation_rate_p = figure(title="New Owner Confirmation Rate", plot_height=300, plot_width=400, x_axis_type='datetime')
-confirmation_rate_r = confirmation_rate_p.line(x='x', y='confirmation_rate', source=owner_onboarding_source, color="#2222aa", line_width=1)
-confirmation_rate_p.yaxis.formatter = NumeralTickFormatter(format="0%")
+oo_plots[2].yaxis.formatter = NumeralTickFormatter(format="0%")
+oo_plots[3].yaxis.formatter = NumeralTickFormatter(format="0%")
+oo_plots[5].yaxis.formatter = NumeralTickFormatter(format="0%")
 
 sel_country3 = Select(title="Country:", options=country_options, value="All")
 sel_country3.on_change('value', update_owner_onboarding)
 
 oo_inputs = widgetbox(sel_country3)
 
-oo_layout = gridplot([oo_inputs, owner_assignments_p, owner_apps_p, owner_success_p, owner_numbers_p, owner_inactive_p, confirmation_rate_p], ncols=3)
+oo_layout = gridplot([oo_inputs] + oo_plots, ncols=3)
 tab3 = Panel(child=oo_layout, title="Owner Onboarding")
 
 # Layout of tabs for the whole dashboard
