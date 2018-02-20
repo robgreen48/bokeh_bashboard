@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import datetime
+from dateutil.relativedelta import relativedelta
 
 from bokeh.io import curdoc
 from bokeh.plotting import figure, show
@@ -203,6 +204,7 @@ so_plots_title_map = {
 
 so_plots = []
 
+# Plot all ColumnDataSource values
 for c, col in enumerate(['nb_applications', 'confirmed_sits', 'is_successful', 'percent_inactive', 'num_sitters']):
     fig = figure(title=so_plots_title_map[col], plot_height=300, plot_width=400, x_axis_type='datetime')
     fig.line(x='x', y=col, source=sitter_onboarding_source, color=brewer['Dark2'][5][c], line_width=1)
@@ -323,6 +325,7 @@ oo_plots_title_map = {
 
 oo_plots = []
 
+# Plot all ColumnDataSource values
 for c, col in enumerate(['nb_assignments', 'nb_apps_per_assignment', 'is_successful', 'percent_inactive', 'nb_owners', 'confirmation_rate']):
     fig = figure(title=oo_plots_title_map[col], plot_height=300, plot_width=400, x_axis_type='datetime')
     fig.line(x='x', y=col, source=owner_onboarding_source, color=brewer['Dark2'][6][c], line_width=1)
@@ -340,8 +343,115 @@ oo_inputs = widgetbox(sel_country3)
 oo_layout = gridplot([oo_inputs] + oo_plots, ncols=3)
 tab3 = Panel(child=oo_layout, title="Owner Onboarding")
 
+
+###
+###
+### Start Network Health data manipulation
+
+def get_unique_owners(df):
+    return df.ouser_id.nunique()
+
+def get_unique_sitters(df):
+    return df.suser_id.nunique()
+
+def get_number_apps(df):
+    return df.request_id.count()
+
+def get_number_assignments(df):
+    return df.aid.nunique()
+
+def get_filled_assignments(df):
+    return df.is_assignment_filled.sum()
+
+def get_successful_sitters(df):
+    successful_sitter_count = df[df.is_assignment_filled ==1].suser_id.nunique()
+    return successful_sitter_count
+
+def get_successful_owners(df):
+    successful_owner_count = df[df.is_assignment_filled ==1].ouser_id.nunique()
+    return successful_owner_count
+
+# Create dfs from original uploads
+asgnmts.reset_index(inplace=True, drop=False)
+nh_assignments = asgnmts.copy()
+
+nh_applications = (
+    pd.merge(apps, nh_assignments[['aid', 'created_date']],
+             how='left',
+             left_on='assignment_id',
+             right_on='aid')
+)
+
+nh_applications = nh_applications[~nh_applications.aid.isnull()]
+nh_applications.set_index('created_date', drop=False, inplace=True)
+nh_assignments.set_index('created_date', drop=False, inplace=True)
+
+#start = date.today() - relativedelta(months=12) 
+start = datetime.date(2016, 1, 1) # when to start the analysis from
+
+nh_index = pd.date_range(start=start, end=nh_applications.created_date.max()) # create index of dates
+
+# dictionary containing lists of data - used to create df
+nh_values = {'owners':[],
+          'successful_owners' :[],
+          'applications' :[],
+          'assignments':[],
+          'filled_assignments':[],
+          'sitters':[],
+          'successful_sitters':[]
+         }
+
+# put data in the values dictionary 
+for day in nh_index:
+    twelve_months_prior = day - relativedelta(months=12)
+
+    app_view = nh_applications.loc[str(twelve_months_prior):str(day.date())] # slice of applications df
+    assg_view = nh_assignments.loc[str(twelve_months_prior):str(day.date())] # slice of assignments df
+    
+    nh_values['owners'].append(get_unique_owners(assg_view))
+    nh_values['sitters'].append(get_unique_sitters(app_view))
+    nh_values['applications'].append(get_number_apps(app_view))
+    nh_values['assignments'].append(get_number_assignments(assg_view))
+    nh_values['filled_assignments'].append(get_filled_assignments(assg_view))
+    nh_values['successful_sitters'].append(get_successful_sitters(assg_view))
+    nh_values['successful_owners'].append(get_successful_owners(assg_view))
+
+# create df from values dictionary
+rolling_data = pd.DataFrame(data=nh_values, index=nh_index)
+
+# broadcast new calculated columns
+rolling_data['assignments_per_owner'] = rolling_data.assignments / rolling_data.owners
+rolling_data['apps_per_assignment'] = rolling_data.applications / rolling_data.assignments
+rolling_data['owner_success'] = rolling_data.successful_owners / rolling_data.owners
+rolling_data['confirmation_rate'] = (rolling_data.filled_assignments / rolling_data.assignments)
+rolling_data['sits_per_sitter'] = (rolling_data.filled_assignments / rolling_data.sitters)
+rolling_data['sitter_success'] = rolling_data.successful_sitters / rolling_data.sitters
+rolling_data['member_ratio'] = rolling_data.sitters / rolling_data.owners
+
+def create_rolling_data_source(data):
+    source = dict(
+        x=data.index,
+        assignments_per_owner=data.assignments_per_owner,
+        apps_per_assignment=data.apps_per_assignment,
+        owner_success=data.owner_success,
+        confirmation_rate=data.confirmation_rate,
+        sits_per_sitter=data.sits_per_sitter,
+        sitter_success=data.sitter_success,
+        member_ratio=data.member_ratio)
+
+    return source
+
+rolling_data_source = ColumnDataSource(data=create_rolling_data_source(rolling_data))
+
+# Create figure for sitter success
+active_sitter_success_p = figure(title="Active Sitter Success", plot_height=400, plot_width=400, x_axis_type='datetime')
+active_sitter_success_r = active_sitter_success_p.line(x='x', y='sitter_success', source=rolling_data_source)
+
+nh_layout = row(active_sitter_success_p)
+tab4 = Panel(child=nh_layout, title="Network Health")
+
 # Layout of tabs for the whole dashboard
-tabs = [tab1, tab2, tab3]
+tabs = [tab1, tab2, tab3, tab4]
 
 # Add tabs to curdoc
 curdoc().add_root(Tabs(tabs=tabs))
