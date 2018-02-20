@@ -348,29 +348,6 @@ tab3 = Panel(child=oo_layout, title="Owner Onboarding")
 ###
 ### Start Network Health data manipulation
 
-def get_unique_owners(df):
-    return df.ouser_id.nunique()
-
-def get_unique_sitters(df):
-    return df.suser_id.nunique()
-
-def get_number_apps(df):
-    return df.request_id.count()
-
-def get_number_assignments(df):
-    return df.aid.nunique()
-
-def get_filled_assignments(df):
-    return df.is_assignment_filled.sum()
-
-def get_successful_sitters(df):
-    successful_sitter_count = df[df.is_assignment_filled ==1].suser_id.nunique()
-    return successful_sitter_count
-
-def get_successful_owners(df):
-    successful_owner_count = df[df.is_assignment_filled ==1].ouser_id.nunique()
-    return successful_owner_count
-
 # Create dfs from original uploads
 asgnmts.reset_index(inplace=True, drop=False)
 nh_assignments = asgnmts.copy()
@@ -386,44 +363,44 @@ nh_applications = nh_applications[~nh_applications.aid.isnull()]
 nh_applications.set_index('created_date', drop=False, inplace=True)
 nh_assignments.set_index('created_date', drop=False, inplace=True)
 
-#start = date.today() - relativedelta(months=12) 
-start = datetime.date(2016, 1, 1) # when to start the analysis from
-
-nh_index = pd.date_range(start=start, end=nh_applications.created_date.max()) # create index of dates
-
-# dictionary containing lists of data - used to create df
-nh_values = {'owners':[],
-          'successful_owners' :[],
-          'applications' :[],
-          'assignments':[],
-          'filled_assignments':[],
-          'sitters':[],
-          'successful_sitters':[]
-         }
-
-# put data in the values dictionary 
-for day in nh_index:
-    twelve_months_prior = day - relativedelta(months=12)
-
-    app_view = nh_applications.loc[str(twelve_months_prior):str(day.date())] # slice of applications df
-    assg_view = nh_assignments.loc[str(twelve_months_prior):str(day.date())] # slice of assignments df
+def calculate_rolling(apps_data, assgs_data, date_index):
     
-    nh_values['owners'].append(get_unique_owners(assg_view))
-    nh_values['sitters'].append(get_unique_sitters(app_view))
-    nh_values['applications'].append(get_number_apps(app_view))
-    nh_values['assignments'].append(get_number_assignments(assg_view))
-    nh_values['filled_assignments'].append(get_filled_assignments(assg_view))
-    nh_values['successful_sitters'].append(get_successful_sitters(assg_view))
-    nh_values['successful_owners'].append(get_successful_owners(assg_view))
+    values = {'owners':[],
+              'successful_owners' :[],
+              'applications' :[],
+              'assignments':[],
+              'filled_assignments':[],
+              'sitters':[],
+              'successful_sitters':[]
+        }
+
+    for day in date_index:
+        twelve_months_prior = day - relativedelta(months=12)
+
+        app_view = apps_data.loc[str(twelve_months_prior):str(day.date())] # slice of applications df
+        assg_view = assgs_data.loc[str(twelve_months_prior):str(day.date())] # slice of assignments df
+
+        values['owners'].append(assg_view.ouser_id.nunique())
+        values['sitters'].append(app_view.suser_id.nunique())
+        values['applications'].append(app_view.request_id.count())
+        values['assignments'].append(assg_view.aid.nunique())
+        values['filled_assignments'].append(assg_view.is_assignment_filled.sum())
+        values['successful_sitters'].append(assg_view[assg_view.is_assignment_filled ==1].suser_id.nunique())
+        values['successful_owners'].append(assg_view[assg_view.is_assignment_filled ==1].ouser_id.nunique())
+
+    return pd.DataFrame(data=values, index=date_index)
+
+
+nh_index = pd.date_range(start=REPORT_START, end=nh_applications.created_date.max()) # create index of dates
 
 # create df from values dictionary
-rolling_data = pd.DataFrame(data=nh_values, index=nh_index)
+rolling_data = calculate_rolling(nh_applications, nh_assignments, nh_index)
 
 # broadcast new calculated columns
 rolling_data['assignments_per_owner'] = rolling_data.assignments / rolling_data.owners
 rolling_data['apps_per_assignment'] = rolling_data.applications / rolling_data.assignments
 rolling_data['owner_success'] = rolling_data.successful_owners / rolling_data.owners
-rolling_data['confirmation_rate'] = (rolling_data.filled_assignments / rolling_data.assignments)
+rolling_data['confirmation_rate'] = rolling_data.filled_assignments / rolling_data.assignments
 rolling_data['sits_per_sitter'] = (rolling_data.filled_assignments / rolling_data.sitters)
 rolling_data['sitter_success'] = rolling_data.successful_sitters / rolling_data.sitters
 rolling_data['member_ratio'] = rolling_data.sitters / rolling_data.owners
