@@ -1,12 +1,13 @@
 import numpy as np
 import pandas as pd
 import datetime
+from time import strftime
 from dateutil.relativedelta import relativedelta
 
 from bokeh.io import curdoc
 from bokeh.plotting import figure, show
-from bokeh.layouts import row, widgetbox, gridplot
-from bokeh.models import ColumnDataSource, DatetimeTickFormatter, NumeralTickFormatter
+from bokeh.layouts import row, column, widgetbox, gridplot
+from bokeh.models import ColumnDataSource, DatetimeTickFormatter, NumeralTickFormatter, HoverTool
 from bokeh.palettes import brewer
 from bokeh.models.widgets import Select, Div, Panel, Tabs
 
@@ -33,23 +34,29 @@ all_members = member_numbers.groupby('period_end')[['homeowner', 'housesitter', 
 # Create the ColumnDataSource for plotting
 def create_growth_source(data):
     source = dict(
-        xs=[data.period_end,
-            data.period_end,
-            data.period_end],
-        ys=[data.homeowner,
-            data.housesitter,
-            data.combined],
-        colors=brewer['Dark2'][3],
-        labels=['Owners', 'Sitters', 'Combined'])
+        x=data.period_end,
+        owners=data.homeowner,
+        sitters=data.housesitter,
+        combined=data.combined,
+        datestr=[d.strftime("%d-%m-%Y") for d in data.period_end])
 
     return source
 
 growth_source = ColumnDataSource(data=create_growth_source(all_members))
 
-
 # Create figure for growth grapth
-growth_p = figure(title="Membership Growth", plot_height=400, plot_width=400, x_axis_type='datetime')
-growth_r = growth_p.multi_line(xs='xs', ys='ys', source=growth_source, color='colors', legend='labels')
+growth_p = figure(title="Membership Growth", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Members")
+g1 = growth_p.line(x='x', y='owners', source=growth_source, legend='Owners', color=brewer['Dark2'][3][0])
+growth_p.add_tools(HoverTool(renderers=[g1], show_arrow=False, line_policy='next', tooltips=[
+        ('Owners', '@owners'),
+        ('Sitters', '@sitters'),
+        ('Combined', '@combined'),
+        ('Date',  '@datestr')],
+    mode='vline'
+    )
+)
+g2 = growth_p.line(x='x', y='sitters', source=growth_source, legend='Sitters', color=brewer['Dark2'][3][1])
+g3 = growth_p.line(x='x', y='combined', source=growth_source, legend='Combined', color=brewer['Dark2'][3][2])
 growth_p.legend.location = "top_left"
 
 
@@ -57,23 +64,29 @@ growth_p.legend.location = "top_left"
 def create_ratio_source(data):
     source = dict(
         x=data.period_end,
-        y=data.housesitter / data.homeowner)
+        y=data.housesitter / data.homeowner,
+        datestr=[d.strftime("%d-%m-%Y") for d in data.period_end])
     return source
 
 ratio_source = ColumnDataSource(data=create_ratio_source(all_members))
 
 # Create figure for ratio graph
-ratio_p = figure(title="Membership Ratio", plot_height=400, plot_width=400, x_axis_type='datetime', y_range=(0,10))
-ratio_r = ratio_p.line(x='x', y='y', source=ratio_source, color="#2222aa", line_width=1)
-
+ratio_p = figure(title="Membership Ratio (Sitters:Owners)", plot_height=300, plot_width=1000, x_axis_type='datetime', y_range=(0,12), y_axis_label="Ratio")
+ratio_p.square(x='x', y='y', source=ratio_source, color="#2222aa", fill_color=None, line_width=1)
+ratio_p.line(x='x', y='y', source=ratio_source, color="#2222aa", line_width=1)
+ratio_p.add_tools(HoverTool(show_arrow=False, line_policy='next', tooltips=[
+        ('Ratio', '@y'),
+        ('Date',  '@datestr'),]
+    , mode='vline')
+)
 
 # Generate text for counts div
 def generate_counts_html(source):
 
-    last_count = (source.data['ys'][0].shape[0]) - 1
-    owner_count = (source.data['ys'][0][last_count]).astype('str')
-    sitter_count = (source.data['ys'][1][last_count]).astype('str')
-    combined_count = (source.data['ys'][2][last_count]).astype('str')
+    last_count = (source.data['owners'].shape[0]) - 1
+    owner_count = (source.data['owners'][last_count]).astype('str')
+    sitter_count = (source.data['sitters'][last_count]).astype('str')
+    combined_count = (source.data['combined'][last_count]).astype('str')
     
     text = str("<ul><li>" + owner_count + " Owners</li>" + "<li>" + sitter_count + " Sitters </li>"  + "<li>" + combined_count + " Combined</li></ul>")
     
@@ -104,8 +117,8 @@ sel_country.on_change('value', update)
 a_number = Div(text=generate_counts_html(growth_source), width=200, height=100)
 
 # Set up layouts and add to tab1
-growth_inputs = widgetbox(sel_country, a_number)
-growth_layout = row(growth_inputs, growth_p, ratio_p, width=1200)
+growth_inputs = row(sel_country, a_number)
+growth_layout = column(growth_inputs, growth_p, ratio_p, width=1200)
 tab1 = Panel(child=growth_layout, title="Membership Growth")
 
 ###
@@ -422,7 +435,7 @@ rolling_data_source = ColumnDataSource(data=create_rolling_data_source(rolling_d
 
 # Create figure for sitter success
 active_sitter_success_p = figure(title="Active Sitter Success", plot_height=400, plot_width=400, x_axis_type='datetime')
-active_sitter_success_r = active_sitter_success_p.line(x='x', y='sitter_success', source=rolling_data_source)
+active_sitter_success_p.line(x='x', y='sitter_success', source=rolling_data_source)
 
 nh_layout = row(active_sitter_success_p)
 tab4 = Panel(child=nh_layout, title="Network Health")
