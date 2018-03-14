@@ -12,6 +12,7 @@ numpy = "*"
 pandas = "*"
 pytz = "*"
 flask = "*"
+flask-httpauth = "*"
 
 
 [dev-packages]
