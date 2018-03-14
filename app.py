@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request
-
+from flask_httpauth import HTTPBasicAuth
 import numpy as np
 import pandas as pd
 import datetime
@@ -15,7 +15,17 @@ from bokeh.models.widgets import Select, Div, Panel, Tabs
 from bokeh.embed import components
 
 app = Flask(__name__)
+auth = HTTPBasicAuth()
 
+users = {
+    "rob": "password"
+}
+
+@auth.get_password
+def get_pw(username):
+    if username in users:
+        return users.get(username)
+    return None
 
 def visualisation():
 # prepare some data
@@ -27,6 +37,7 @@ def visualisation():
 
 # Index page, no args
 @app.route('/')
+@auth.login_required
 def index():
     # TODO: render stuff
     plot = visualisation()
