@@ -1,3 +1,4 @@
+import os
 from flask import Flask, render_template, request
 from flask_httpauth import HTTPBasicAuth
 import numpy as np
@@ -14,11 +15,13 @@ from bokeh.palettes import brewer
 from bokeh.models.widgets import Select, Div, Panel, Tabs
 from bokeh.embed import components
 
+import settings
+
 app = Flask(__name__)
 auth = HTTPBasicAuth()
 
 users = {
-    "rob": "password"
+    settings.GLOBALUSER: settings.GLOBALPASS
 }
 
 @auth.get_password
