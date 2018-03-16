@@ -34,13 +34,13 @@ def get_pw(username):
 TOOLS = "pan,wheel_zoom,box_zoom,reset"
 
 REPORT_START = '01-Jan-2016' # Earliest point for all plots
-REPORT_END = '31-Oct-2017' # End point for onboarding reports, usually 3 months in the past
+REPORT_END = '30-Nov-2017' # End point for onboarding reports, usually 3 months in the past
 
 
 ### Start growth data manipulation ###
 
-member_numbers = pd.read_csv('data_files/num-active.csv', parse_dates=(['period_end']))
-member_numbers = (member_numbers.groupby(['period_end', 'country', 'membership_type'])['num_active']
+member_numbers = pd.read_csv('data_files/180301-num-active.csv', parse_dates=(['period']))
+member_numbers = (member_numbers.groupby(['period', 'country', 'membership_type'])['num_active']
         .sum()
         .unstack() # unstack the membership_type column
 ).reset_index()
@@ -52,17 +52,17 @@ member_numbers.fillna(0, inplace=True)
 member_numbers[['homeowner', 'housesitter', 'combined']] = member_numbers[['homeowner', 'housesitter', 'combined']].astype(int)
 
 # Set an inital state for plotting all member data
-all_members = member_numbers.groupby('period_end')[['homeowner', 'housesitter', 'combined']].sum().reset_index()
+all_members = member_numbers.groupby('period')[['homeowner', 'housesitter', 'combined']].sum().reset_index()
 
 
 # Create the ColumnDataSource for plotting
 def create_growth_source(data):
     source = dict(
-        x=data.period_end,
+        x=data.period,
         Owners=data.homeowner,
         Sitters=data.housesitter,
         Combined=data.combined,
-        datestr=[d.strftime("%d-%m-%Y") for d in data.period_end])
+        datestr=[d.strftime("%d-%m-%Y") for d in data.period])
 
     return source
 
@@ -88,9 +88,9 @@ growth_p.legend.location = "top_left"
 # Create ratio ColumnDataSource for plotting
 def create_ratio_source(data):
     source = dict(
-        x=data.period_end,
+        x=data.period,
         y=data.housesitter / data.homeowner,
-        datestr=[d.strftime("%d-%m-%Y") for d in data.period_end])
+        datestr=[d.strftime("%d-%m-%Y") for d in data.period])
     return source
 
 ratio_source = ColumnDataSource(data=create_ratio_source(all_members))
@@ -123,9 +123,9 @@ def update(attr, old, new):
     country = sel_country.value
 
     if country == 'All':
-        data = member_numbers.groupby('period_end')[['homeowner', 'housesitter', 'combined']].sum().reset_index()
+        data = member_numbers.groupby('period')[['homeowner', 'housesitter', 'combined']].sum().reset_index()
     else:
-        data = member_numbers[member_numbers.country_cat == country].groupby('period_end')[['homeowner', 'housesitter', 'combined']].sum().reset_index()
+        data = member_numbers[member_numbers.country_cat == country].groupby('period')[['homeowner', 'housesitter', 'combined']].sum().reset_index()
     
     growth_source.data = create_growth_source(data)
     ratio_source.data = create_ratio_source(data)
@@ -148,8 +148,8 @@ tab1 = Panel(child=growth_layout, title="Membership Growth")
 
 ### Start Sitter success data manipulation ###
 
-apps = pd.read_csv('data_files/180201-applications.csv', parse_dates=['date_created', 'last_modified'])
-sitters = pd.read_csv('data_files/180201-sitters.csv', parse_dates=['fst_start_date', 'start_date', 'expires_date'])
+apps = pd.read_csv('data_files/180301-applications.csv', parse_dates=['date_created', 'last_modified'])
+sitters = pd.read_csv('data_files/180301-sitters.csv', parse_dates=['fst_start_date', 'start_date', 'expires_date'])
 
 apps = pd.merge(
     apps,
@@ -267,14 +267,14 @@ tab2 = Panel(child=sitter_onb_layout, title="Sitter Onboarding")
 
 ### Start Owner success data manipulation ###
 
-asgnmts = pd.read_csv('data_files/180201-assignments.csv', parse_dates=['created_date', 'start_date', 'end_date'])
+asgnmts = pd.read_csv('data_files/180301-assignments.csv', parse_dates=['created_date', 'start_date', 'end_date'])
 asgnmts['is_assignment_filled'] = asgnmts.sid.notnull()
 
 app_count = apps.groupby('assignment_id')['req_type'].count()
 asgnmts.set_index('aid', inplace=True)
 asgnmts['nb_applications'] = app_count
 
-owners = pd.read_csv('data_files/180201-owners.csv', parse_dates=['joined_date', 'fst_start_date', 'start_date', 'expires_date', 'published_date'])
+owners = pd.read_csv('data_files/180301-owners.csv', parse_dates=['joined_date', 'fst_start_date', 'start_date', 'expires_date', 'published_date'])
 assignments_impr = pd.merge(asgnmts,
                             owners[['user_id','billing_country', 'fst_start_date']],
                             left_on='ouser_id', right_on='user_id')
