@@ -36,26 +36,27 @@ TOOLS = "pan,wheel_zoom,box_zoom,reset"
 REPORT_START = '01-Jan-2016' # Earliest point for all plots
 REPORT_END = '30-Nov-2017' # End point for onboarding reports, usually 3 months in the past
 
+TOP_MARKETS = ['United Kingdom','United States', 'Australia', 'Canada', 'New Zealand']
+COUNTRY_OPTIONS = ["All", "United Kingdom", "United States", "Australia", "Canada", "New Zealand", "ROW"]
 
-### Start growth data manipulation ###
+# Growth data manipulation
+def manipulate_numactive():
+    member_numbers = pd.read_csv('data_files/180301-num-active.csv', parse_dates=(['period']))
+    member_numbers = (member_numbers.groupby(['period', 'country', 'membership_type'])['num_active']
+            .sum()
+            .unstack() # unstack the membership_type column
+    ).reset_index()
 
-member_numbers = pd.read_csv('data_files/180301-num-active.csv', parse_dates=(['period']))
-member_numbers = (member_numbers.groupby(['period', 'country', 'membership_type'])['num_active']
-        .sum()
-        .unstack() # unstack the membership_type column
-).reset_index()
+    member_numbers['country_cat'] = [x if x in TOP_MARKETS else 'ROW' for x in member_numbers['country']]
+    member_numbers.fillna(0, inplace=True)
+    member_numbers[['homeowner', 'housesitter', 'combined']] = member_numbers[['homeowner', 'housesitter', 'combined']].astype(int)
 
-top_markets = ['United Kingdom','United States', 'Australia', 'Canada', 'New Zealand']
+    # Set an inital state for plotting all member data
+    all_members = member_numbers.groupby('period')[['homeowner', 'housesitter', 'combined']].sum().reset_index()
 
-member_numbers['country_cat'] = [x if x in top_markets else 'ROW' for x in member_numbers['country']]
-member_numbers.fillna(0, inplace=True)
-member_numbers[['homeowner', 'housesitter', 'combined']] = member_numbers[['homeowner', 'housesitter', 'combined']].astype(int)
+    return all_members
 
-# Set an inital state for plotting all member data
-all_members = member_numbers.groupby('period')[['homeowner', 'housesitter', 'combined']].sum().reset_index()
-
-
-# Create the ColumnDataSource for plotting
+# Create the ColumnDataSource for plotting growth
 def create_growth_source(data):
     source = dict(
         x=data.period,
@@ -66,24 +67,25 @@ def create_growth_source(data):
 
     return source
 
-growth_source = ColumnDataSource(data=create_growth_source(all_members))
+# Growth plot
+def visualise_growth():
+    p = figure(title="Membership Growth", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Members", tools=TOOLS)
 
-growth_p = figure(title="Membership Growth", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Members", tools=TOOLS)
+    for idx, member in enumerate(['Owners', 'Sitters', 'Combined']):
+        g1 = p.line(x='x', y=member, source=growth_source, legend="Membership = {}".format(member), color=brewer['Dark2'][3][idx], line_width=2)
 
-for idx, member in enumerate(['Owners', 'Sitters', 'Combined']):
-    g1 = growth_p.line(x='x', y=member, source=growth_source, legend="Membership = {}".format(member), color=brewer['Dark2'][3][idx], line_width=2)
-
-growth_p.add_tools(HoverTool(renderers=[g1], show_arrow=False, line_policy='next', tooltips=[
-        ('Owners', '@Owners'),
-        ('Sitters', '@Sitters'),
-        ('Combined', '@Combined'),
-        ('Date',  '@datestr')],
-    mode='vline'
+    p.add_tools(HoverTool(renderers=[g1], show_arrow=False, line_policy='next', tooltips=[
+            ('Owners', '@Owners'),
+            ('Sitters', '@Sitters'),
+            ('Combined', '@Combined'),
+            ('Date',  '@datestr')],
+        mode='vline'
+        )
     )
-)
 
-growth_p.legend.location = "top_left"
+    p.legend.location = "top_left"
 
+    return p
 
 # Create ratio ColumnDataSource for plotting
 def create_ratio_source(data):
@@ -93,16 +95,18 @@ def create_ratio_source(data):
         datestr=[d.strftime("%d-%m-%Y") for d in data.period])
     return source
 
-ratio_source = ColumnDataSource(data=create_ratio_source(all_members))
+# Ratio plot
+def visualise_ratio():
+    p = figure(title="Membership Ratio (Sitters:Owners)", plot_height=300, plot_width=1000, x_axis_type='datetime', y_range=(0,12), y_axis_label="Ratio", tools=TOOLS)
+    p.square(x='x', y='y', source=ratio_source, color="#2222aa", fill_color=None, line_width=1)
+    p.line(x='x', y='y', source=ratio_source, color="#2222aa", line_width=1)
+    p.add_tools(HoverTool(line_policy='next', tooltips=[
+            ('Ratio', '@y'),
+            ('Date',  '@datestr'),]
+        , mode='vline')
+    )
 
-ratio_p = figure(title="Membership Ratio (Sitters:Owners)", plot_height=300, plot_width=1000, x_axis_type='datetime', y_range=(0,12), y_axis_label="Ratio", tools=TOOLS)
-ratio_p.square(x='x', y='y', source=ratio_source, color="#2222aa", fill_color=None, line_width=1)
-ratio_p.line(x='x', y='y', source=ratio_source, color="#2222aa", line_width=1)
-ratio_p.add_tools(HoverTool(line_policy='next', tooltips=[
-        ('Ratio', '@y'),
-        ('Date',  '@datestr'),]
-    , mode='vline')
-)
+    return p
 
 # Generate text for counts div
 def generate_counts_html(source):
@@ -116,8 +120,7 @@ def generate_counts_html(source):
     
     return text
 
-
-# Callback to update plots
+# Callback to update growth and ratio plots, and the div text
 def update(attr, old, new):
 
     country = sel_country.value
@@ -131,10 +134,15 @@ def update(attr, old, new):
     ratio_source.data = create_ratio_source(data)
     a_number.text = generate_counts_html(growth_source)
 
+# Create the DataSources and plot
+all_members = manipulate_numactive()
+growth_source = ColumnDataSource(data=create_growth_source(all_members))
+growth_plot = visualise_growth()
+ratio_source = ColumnDataSource(data=create_ratio_source(all_members))
+ratio_plot = visualise_ratio()
 
 # Select box for country
-country_options = ["All", "United Kingdom", "United States", "Australia", "Canada", "New Zealand", "ROW"]
-sel_country = Select(title="Country:", options=country_options, value="All")
+sel_country = Select(title="Country:", options=COUNTRY_OPTIONS, value="All")
 sel_country.on_change('value', update)
 
 # Create div for totals
@@ -142,46 +150,47 @@ a_number = Div(text=generate_counts_html(growth_source), width=200, height=100)
 
 # Set up layouts and add to tab1
 growth_inputs = row(sel_country, a_number)
-growth_layout = column(growth_inputs, growth_p, ratio_p, width=1200)
+growth_layout = column(growth_inputs, growth_plot, ratio_plot, width=1200)
 tab1 = Panel(child=growth_layout, title="Membership Growth")
 
 
 ### Start Sitter success data manipulation ###
+def manipulate_sitters_apps():
+    apps = pd.read_csv('data_files/180301-applications.csv', parse_dates=['date_created', 'last_modified'])
+    sitters = pd.read_csv('data_files/180301-sitters.csv', parse_dates=['fst_start_date', 'start_date', 'expires_date'])
 
-apps = pd.read_csv('data_files/180301-applications.csv', parse_dates=['date_created', 'last_modified'])
-sitters = pd.read_csv('data_files/180301-sitters.csv', parse_dates=['fst_start_date', 'start_date', 'expires_date'])
+    apps = pd.merge(
+        apps,
+        sitters[['user_id','fst_start_date', 'billing_country']],
+        left_on='suser_id',
+        right_on='user_id',
+        left_index=True)
 
-apps = pd.merge(
-    apps,
-    sitters[['user_id','fst_start_date', 'billing_country']],
-    left_on='suser_id',
-    right_on='user_id',
-    left_index=True)
+    apps['time_into_membership'] = apps.date_created - apps.fst_start_date
+    apps['is_assignment_filled'] = (apps.oconfirmed == 1) & (apps.sconfirmed ==1)
 
-apps['time_into_membership'] = apps.date_created - apps.fst_start_date
-apps['is_assignment_filled'] = (apps.oconfirmed == 1) & (apps.sconfirmed ==1)
+    # Only look at applications from members in their first three months
+    relevant_applications = apps[
+        (apps.time_into_membership <= datetime.timedelta(days=90))
+        & (apps.time_into_membership >= datetime.timedelta(days=0))
+    ]
 
-# Only look at applications from members in their first three months
-relevant_applications = apps[
-    (apps.time_into_membership <= datetime.timedelta(days=90))
-    & (apps.time_into_membership >= datetime.timedelta(days=0))
-]
+    num_of_apps = relevant_applications['suser_id'].value_counts() #Create series of the number of applications for every sitter
+    num_confirmed = relevant_applications.groupby('suser_id')['is_assignment_filled'].sum() #Create series of the number of confirmed applications for every sitter
 
-num_of_apps = relevant_applications['suser_id'].value_counts() #Create series of the number of applications for every sitter
-num_confirmed = relevant_applications.groupby('suser_id')['is_assignment_filled'].sum() #Create series of the number of confirmed applications for every sitter
+    sitter_data = sitters[['user_id', 'fst_start_date', 'billing_country']].copy()
+    sitter_data.set_index('user_id', inplace=True)
 
-onboarding_sitters = sitters[['user_id', 'fst_start_date', 'billing_country']].copy()
-onboarding_sitters.set_index('user_id', inplace=True)
+    # Additional columns and indexing
+    sitter_data['nb_applications'] = num_of_apps
+    sitter_data['confirmed_sits'] = num_confirmed
+    sitter_data['is_successful'] = sitter_data.confirmed_sits > 0
+    sitter_data['country_cat'] = [x if x in TOP_MARKETS else 'ROW' for x in sitter_data['billing_country']]
+    sitter_data.reset_index(inplace=True)
+    sitter_data.set_index('fst_start_date', inplace=True)
+    sitter_data = sitter_data.fillna(0)
 
-# Additional columns and indexing
-onboarding_sitters['nb_applications'] = num_of_apps
-onboarding_sitters['confirmed_sits'] = num_confirmed
-onboarding_sitters['is_successful'] = onboarding_sitters.confirmed_sits > 0
-onboarding_sitters['country_cat'] = [x if x in top_markets else 'ROW' for x in onboarding_sitters['billing_country']]
-onboarding_sitters.reset_index(inplace=True)
-onboarding_sitters.set_index('fst_start_date', inplace=True)
-onboarding_sitters = onboarding_sitters.fillna(0)
-
+    return apps, sitter_data
 
 def create_sitter_onboarding_source(data):
 
@@ -213,9 +222,6 @@ def create_sitter_onboarding_source(data):
 
     return source
 
-sitter_onboarding_source = ColumnDataSource(data=create_sitter_onboarding_source(onboarding_sitters))
-
-
 # Callback to update sitter onboarding plots
 def update_sitter_onboarding(attr, old, new):
 
@@ -229,80 +235,86 @@ def update_sitter_onboarding(attr, old, new):
     # Update the source data
     sitter_onboarding_source.data = create_sitter_onboarding_source(so_data)
 
-so_plots_title_map = {
-    'nb_applications': 'New Sitter Applications',
-    'confirmed_sits': 'Confirmed Sits',
-    'percent_inactive': 'New Sitter Inactivity',
-    'num_sitters': 'Number Of New Sitters'}
+def visualise_sitter_onboarding():
+    title_map = {
+        'nb_applications': 'New Sitter Applications',
+        'confirmed_sits': 'Confirmed Sits',
+        'percent_inactive': 'New Sitter Inactivity',
+        'num_sitters': 'Number Of New Sitters'}
 
-p_so_success = figure(title="New Sitter Success", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Percent Successful", tools=TOOLS)
-p_so_success.square(x='x', y='is_successful', source=sitter_onboarding_source, color="#2222aa", fill_color=None, line_width=1)
-p_so_success.line(x='x', y='is_successful', source=sitter_onboarding_source, color="#2222aa", line_width=1)
-p_so_success.yaxis.formatter = NumeralTickFormatter(format="0%")
-p_so_success.add_tools(HoverTool(line_policy='next', tooltips=[
-        ('Success Rate', '@is_successful{0.00%}'),
-        ('Date',  '@datestr'),]
-    , mode='vline')
-)
-so_plots = []
+    p = figure(title="New Sitter Success", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Percent Successful", tools=TOOLS)
+    p.square(x='x', y='is_successful', source=sitter_onboarding_source, color="#2222aa", fill_color=None, line_width=1)
+    p.line(x='x', y='is_successful', source=sitter_onboarding_source, color="#2222aa", line_width=1)
+    p.yaxis.formatter = NumeralTickFormatter(format="0%")
+    p.add_tools(HoverTool(line_policy='next', tooltips=[
+            ('Success Rate', '@is_successful{0.00%}'),
+            ('Date',  '@datestr'),]
+        , mode='vline')
+    )
+    
+    plots = []
 
-# Plot all ColumnDataSource values
-for c, col in enumerate(['nb_applications', 'confirmed_sits', 'percent_inactive', 'num_sitters']):
-    fig = figure(title=so_plots_title_map[col], plot_height=250, plot_width=500, x_axis_type='datetime', tools=TOOLS)
-    fig.line(x='x', y=col, source=sitter_onboarding_source, color=brewer['Dark2'][5][c], line_width=1)
-    so_plots.append(fig)
+    # Plot all ColumnDataSource values
+    for c, col in enumerate(['nb_applications', 'confirmed_sits', 'percent_inactive', 'num_sitters']):
+        fig = figure(title=title_map[col], plot_height=250, plot_width=500, x_axis_type='datetime', tools=TOOLS)
+        fig.line(x='x', y=col, source=sitter_onboarding_source, color=brewer['Dark2'][5][c], line_width=1)
+        plots.append(fig)
 
-so_plots[2].yaxis.formatter = NumeralTickFormatter(format="0%")
+    plots[2].yaxis.formatter = NumeralTickFormatter(format="0%")
 
-sel_country2 = Select(title="Country:", options=country_options, value="All")
+    return p, plots
+
+apps, onboarding_sitters = manipulate_sitters_apps()
+sitter_onboarding_source = ColumnDataSource(data=create_sitter_onboarding_source(onboarding_sitters))
+so_success_plot, so_plots = visualise_sitter_onboarding()
+
+sel_country2 = Select(title="Country:", options=COUNTRY_OPTIONS, value="All")
 sel_country2.on_change('value', update_sitter_onboarding)
 
 so_inputs = widgetbox(sel_country2)
 
-# sitter_onb_layout = gridplot([so_inputs, sitter_inactivity_p, sitter_apps_p, sitter_confirmed_p, sitter_numbers_p, sitter_success_p], ncols=3)
-sitter_onb_layout = column(so_inputs, p_so_success, gridplot(so_plots, ncols=2))
+sitter_onb_layout = column(so_inputs, so_success_plot, gridplot(so_plots, ncols=2))
 tab2 = Panel(child=sitter_onb_layout, title="Sitter Onboarding")
-# additional tabs tab2, tab3....
-
 
 ### Start Owner success data manipulation ###
+def manipulate_owner_assignments():
+    asgnmts = pd.read_csv('data_files/180301-assignments.csv', parse_dates=['created_date', 'start_date', 'end_date'])
+    asgnmts['is_assignment_filled'] = asgnmts.sid.notnull()
 
-asgnmts = pd.read_csv('data_files/180301-assignments.csv', parse_dates=['created_date', 'start_date', 'end_date'])
-asgnmts['is_assignment_filled'] = asgnmts.sid.notnull()
+    app_count = apps.groupby('assignment_id')['req_type'].count()
+    asgnmts.set_index('aid', inplace=True)
+    asgnmts['nb_applications'] = app_count
 
-app_count = apps.groupby('assignment_id')['req_type'].count()
-asgnmts.set_index('aid', inplace=True)
-asgnmts['nb_applications'] = app_count
+    owners = pd.read_csv('data_files/180301-owners.csv', parse_dates=['joined_date', 'fst_start_date', 'start_date', 'expires_date', 'published_date'])
+    assignments_impr = pd.merge(asgnmts,
+                                owners[['user_id','billing_country', 'fst_start_date']],
+                                left_on='ouser_id', right_on='user_id')
+    assignments_impr['time_into_membership'] = assignments_impr.created_date - assignments_impr.fst_start_date
 
-owners = pd.read_csv('data_files/180301-owners.csv', parse_dates=['joined_date', 'fst_start_date', 'start_date', 'expires_date', 'published_date'])
-assignments_impr = pd.merge(asgnmts,
-                            owners[['user_id','billing_country', 'fst_start_date']],
-                            left_on='ouser_id', right_on='user_id')
-assignments_impr['time_into_membership'] = assignments_impr.created_date - assignments_impr.fst_start_date
-
-# select only assignments that were posted in first three months of membership
-relevant_assignments = (
-    assignments_impr[(assignments_impr.time_into_membership <= datetime.timedelta(days=90)) 
-                     & (assignments_impr.time_into_membership >= datetime.timedelta(days=0))]
-).copy()
-relevant_assignments['country_cat'] = [x if x in top_markets else 'ROW' for x in relevant_assignments['billing_country']]
+    # select only assignments that were posted in first three months of membership
+    relevant_assignments = (
+        assignments_impr[(assignments_impr.time_into_membership <= datetime.timedelta(days=90)) 
+                         & (assignments_impr.time_into_membership >= datetime.timedelta(days=0))]
+    ).copy()
+    relevant_assignments['country_cat'] = [x if x in TOP_MARKETS else 'ROW' for x in relevant_assignments['billing_country']]
 
 
-num_of_assignments = relevant_assignments['user_id'].value_counts()
-num_confirmed_sitters = relevant_assignments.groupby('user_id')['is_assignment_filled'].sum()
-num_apps = relevant_assignments.groupby('user_id')['nb_applications'].sum()
+    num_of_assignments = relevant_assignments['user_id'].value_counts()
+    num_confirmed_sitters = relevant_assignments.groupby('user_id')['is_assignment_filled'].sum()
+    num_apps = relevant_assignments.groupby('user_id')['nb_applications'].sum()
 
-owners.set_index('user_id', inplace=True)
-owners['nb_assignments'] = num_of_assignments
-owners['nb_confirmed_sitters'] = num_confirmed_sitters
-owners['nb_applications'] = num_apps
-owners['is_successful'] = owners.nb_confirmed_sitters > 0
-owners['nb_apps_per_assignment'] = owners.nb_applications / owners.nb_assignments
-owners['country_cat'] = [x if x in top_markets else 'ROW' for x in owners['billing_country']]
-owners = owners.fillna(0)
-owners.reset_index(inplace=True)
-owners.set_index('fst_start_date', inplace=True)
+    owners.set_index('user_id', inplace=True)
+    owners['nb_assignments'] = num_of_assignments
+    owners['nb_confirmed_sitters'] = num_confirmed_sitters
+    owners['nb_applications'] = num_apps
+    owners['is_successful'] = owners.nb_confirmed_sitters > 0
+    owners['nb_apps_per_assignment'] = owners.nb_applications / owners.nb_assignments
+    owners['country_cat'] = [x if x in TOP_MARKETS else 'ROW' for x in owners['billing_country']]
+    owners = owners.fillna(0)
+    owners.reset_index(inplace=True)
+    owners.set_index('fst_start_date', inplace=True)
 
+    return asgnmts, relevant_assignments, owners
 
 def create_owner_onboarding_source(owner_data, assignment_data):
 
@@ -338,8 +350,6 @@ def create_owner_onboarding_source(owner_data, assignment_data):
 
     return source
 
-owner_onboarding_source = ColumnDataSource(data=create_owner_onboarding_source(owners, relevant_assignments))
-
 # Callback to update sitter onboarding plots
 def update_owner_onboarding(attr, old, new):
 
@@ -355,61 +365,71 @@ def update_owner_onboarding(attr, old, new):
     # Update the source data
     owner_onboarding_source.data = create_owner_onboarding_source(oo_owner_data, oo_assignment_data)
 
-oo_plots_title_map = {
-    'nb_assignments': 'New Owner Assignments',
-    'percent_inactive': 'New Owner Inactivity',
-    'nb_owners': 'Number Of New Owners',
-    'confirmation_rate': 'New Owner Confirmation Rate'}
+def visualise_owner_onboarding():
+    title_map = {
+        'nb_assignments': 'New Owner Assignments',
+        'percent_inactive': 'New Owner Inactivity',
+        'nb_owners': 'Number Of New Owners',
+        'confirmation_rate': 'New Owner Confirmation Rate'}
 
-p_oo_success = figure(title="New Owner Success", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Percent Successful", tools=TOOLS)
-p_oo_success.square(x='x', y='is_successful', source=owner_onboarding_source, color="#2222aa", fill_color=None, line_width=1)
-p_oo_success.line(x='x', y='is_successful', source=owner_onboarding_source, color="#2222aa", line_width=1)
-p_oo_success.yaxis.formatter = NumeralTickFormatter(format="0%")
-p_oo_success.add_tools(HoverTool(line_policy='next', tooltips=[
-        ('Success Rate', '@is_successful{0.00%}'),
-        ('Date',  '@datestr'),]
-    , mode='vline')
-)
+    p = figure(title="New Owner Success", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Percent Successful", tools=TOOLS)
+    p.square(x='x', y='is_successful', source=owner_onboarding_source, color="#2222aa", fill_color=None, line_width=1)
+    p.line(x='x', y='is_successful', source=owner_onboarding_source, color="#2222aa", line_width=1)
+    p.yaxis.formatter = NumeralTickFormatter(format="0%")
+    p.add_tools(HoverTool(line_policy='next', tooltips=[
+            ('Success Rate', '@is_successful{0.00%}'),
+            ('Date',  '@datestr'),]
+        , mode='vline')
+    )
 
-oo_plots = []
+    plots = []
 
-# Plot all ColumnDataSource values
-for c, col in enumerate(['nb_assignments', 'percent_inactive', 'nb_owners', 'confirmation_rate']):
-    fig = figure(title=oo_plots_title_map[col], plot_height=250, plot_width=500, x_axis_type='datetime', tools=TOOLS)
-    fig.line(x='x', y=col, source=owner_onboarding_source, color=brewer['Dark2'][6][c], line_width=1)
-    oo_plots.append(fig)
+    # Plot all ColumnDataSource values
+    for c, col in enumerate(['nb_assignments', 'percent_inactive', 'nb_owners', 'confirmation_rate']):
+        fig = figure(title=title_map[col], plot_height=250, plot_width=500, x_axis_type='datetime', tools=TOOLS)
+        fig.line(x='x', y=col, source=owner_onboarding_source, color=brewer['Dark2'][6][c], line_width=1)
+        plots.append(fig)
 
-oo_plots[1].yaxis.formatter = NumeralTickFormatter(format="0%")
-oo_plots[3].yaxis.formatter = NumeralTickFormatter(format="0%")
+    plots[1].yaxis.formatter = NumeralTickFormatter(format="0%")
+    plots[3].yaxis.formatter = NumeralTickFormatter(format="0%")
 
-sel_country3 = Select(title="Country:", options=country_options, value="All")
+    return p, plots
+
+asgnmts, relevant_assignments, owners = manipulate_owner_assignments()
+owner_onboarding_source = ColumnDataSource(data=create_owner_onboarding_source(owners, relevant_assignments))
+oo_success_plot, oo_plots = visualise_owner_onboarding()
+
+sel_country3 = Select(title="Country:", options=COUNTRY_OPTIONS, value="All")
 sel_country3.on_change('value', update_owner_onboarding)
 
 oo_inputs = widgetbox(sel_country3)
 
-oo_layout = column(oo_inputs, p_oo_success, gridplot(oo_plots, ncols=2))
+oo_layout = column(oo_inputs, oo_success_plot, gridplot(oo_plots, ncols=2))
 tab3 = Panel(child=oo_layout, title="Owner Onboarding")
-
 
 ### Start Network Health data manipulation ###
 
 # Create dfs from original uploads
-asgnmts.reset_index(inplace=True, drop=False)
-nh_assignments = asgnmts.copy()
+def manipulate_full_data():
+    asgnmts.reset_index(inplace=True, drop=False)
+    nh_assignments = asgnmts.copy()
 
-nh_applications = (
-    pd.merge(apps, nh_assignments[['aid', 'created_date']],
-             how='left',
-             left_on='assignment_id',
-             right_on='aid')
-)
+    nh_applications = (
+        pd.merge(apps, nh_assignments[['aid', 'created_date']],
+                 how='left',
+                 left_on='assignment_id',
+                 right_on='aid')
+    )
 
-nh_applications = nh_applications[~nh_applications.aid.isnull()]
-nh_applications.set_index('created_date', drop=False, inplace=True)
-nh_assignments.set_index('created_date', drop=False, inplace=True)
+    nh_applications = nh_applications[~nh_applications.aid.isnull()]
+    nh_applications.set_index('created_date', drop=False, inplace=True)
+    nh_assignments.set_index('created_date', drop=False, inplace=True)
+
+    date_index = pd.date_range(start=REPORT_START, end=nh_applications.created_date.max()) # create index of dates
+
+    return nh_applications, nh_assignments, date_index
 
 def calculate_rolling(apps_data, assgs_data, date_index):
-    
     values = {'owners':[],
               'successful_owners' :[],
               'applications' :[],
@@ -433,22 +453,19 @@ def calculate_rolling(apps_data, assgs_data, date_index):
         values['successful_sitters'].append(assg_view[assg_view.is_assignment_filled ==1].suser_id.nunique())
         values['successful_owners'].append(assg_view[assg_view.is_assignment_filled ==1].ouser_id.nunique())
 
-    return pd.DataFrame(data=values, index=date_index)
+    
+    df = pd.DataFrame(data=values, index=date_index)
 
+    # broadcast new calculated columns
+    df['assignments_per_owner'] = df.assignments / df.owners
+    df['apps_per_assignment'] = df.applications / df.assignments
+    df['owner_success'] = df.successful_owners / df.owners
+    df['confirmation_rate'] = df.filled_assignments / df.assignments
+    df['sits_per_sitter'] = (df.filled_assignments / df.sitters)
+    df['sitter_success'] = df.successful_sitters / df.sitters
+    df['member_ratio'] = df.sitters / df.owners
 
-nh_index = pd.date_range(start=REPORT_START, end=nh_applications.created_date.max()) # create index of dates
-
-# create df from values dictionary
-rolling_data = calculate_rolling(nh_applications, nh_assignments, nh_index)
-
-# broadcast new calculated columns
-rolling_data['assignments_per_owner'] = rolling_data.assignments / rolling_data.owners
-rolling_data['apps_per_assignment'] = rolling_data.applications / rolling_data.assignments
-rolling_data['owner_success'] = rolling_data.successful_owners / rolling_data.owners
-rolling_data['confirmation_rate'] = rolling_data.filled_assignments / rolling_data.assignments
-rolling_data['sits_per_sitter'] = (rolling_data.filled_assignments / rolling_data.sitters)
-rolling_data['sitter_success'] = rolling_data.successful_sitters / rolling_data.sitters
-rolling_data['member_ratio'] = rolling_data.sitters / rolling_data.owners
+    return df
 
 def create_rolling_data_source(data):
     source = dict(
@@ -464,53 +481,56 @@ def create_rolling_data_source(data):
 
     return source
 
+def visualise_network_health():
+
+    p1 = figure(title="Active Sitter Success", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Percent Successful", tools=TOOLS)
+    p1.line(x='x', y='sitter_success', source=rolling_data_source, color=brewer['Dark2'][7][4], line_width=2)
+    p1.yaxis.formatter = NumeralTickFormatter(format="0%")
+    p1.add_tools(HoverTool(line_policy='next', tooltips=[
+            ('Success Rate', '@sitter_success{0.00%}'),
+            ('Date',  '@datestr'),]
+        , mode='vline')
+    )
+
+    p2 = figure(title="Active Owner Success", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Percent Successful", tools=TOOLS)
+    p2.line(x='x', y='owner_success', source=rolling_data_source, color=brewer['Dark2'][7][5], line_width=2)
+    p2.yaxis.formatter = NumeralTickFormatter(format="0%")
+    p2.add_tools(HoverTool(line_policy='next', tooltips=[
+            ('Success Rate', '@owner_success{0.00%}'),
+            ('Date',  '@datestr'),]
+        , mode='vline')
+    )
+
+    title_map = {
+        'assignments_per_owner': 'Assignments Per Owner',
+        'apps_per_assignment': 'Number Of Applications Per Assignment',
+        'confirmation_rate': 'Confirmation Rate',
+        'sits_per_sitter': 'Sits Per Sitter'}
+
+    plots = []
+
+    # Plot all ColumnDataSource values
+    for c, col in enumerate(['assignments_per_owner', 'apps_per_assignment', 'confirmation_rate', 'sits_per_sitter']):
+        fig = figure(title=title_map[col], plot_height=250, plot_width=500, x_axis_type='datetime', tools=TOOLS)
+        fig.line(x='x', y=col, source=rolling_data_source, color=brewer['Dark2'][7][c], line_width=1)
+        plots.append(fig)
+
+    plots[2].yaxis.formatter = NumeralTickFormatter(format="0%")
+
+    p3 = figure(title="Active Member Ratio", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Ratio", tools=TOOLS)
+    p3.line(x='x', y='member_ratio', source=rolling_data_source, color=brewer['Dark2'][7][6], line_width=2)
+    p3.add_tools(HoverTool(line_policy='next', tooltips=[
+            ('Ratio', '@member_ratio'),
+            ('Date',  '@datestr'),]
+        , mode='vline')
+    )
+
+    return p1, p2, plots, p3
+
+nh_applications, nh_assignments, nh_index = manipulate_full_data()
+rolling_data = calculate_rolling(nh_applications, nh_assignments, nh_index)
 rolling_data_source = ColumnDataSource(data=create_rolling_data_source(rolling_data))
-
-# Create figure for sitter success
-# active_sitter_success_p = figure(title="Active Sitter Success", plot_height=400, plot_width=400, x_axis_type='datetime', tools=TOOLS)
-# active_sitter_success_p.line(x='x', y='sitter_success', source=rolling_data_source)
-
-active_sitter_success_p = figure(title="Active Sitter Success", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Percent Successful", tools=TOOLS)
-active_sitter_success_p.line(x='x', y='sitter_success', source=rolling_data_source, color=brewer['Dark2'][7][4], line_width=2)
-active_sitter_success_p.yaxis.formatter = NumeralTickFormatter(format="0%")
-active_sitter_success_p.add_tools(HoverTool(line_policy='next', tooltips=[
-        ('Success Rate', '@sitter_success{0.00%}'),
-        ('Date',  '@datestr'),]
-    , mode='vline')
-)
-
-active_owner_success_p = figure(title="Active Owner Success", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Percent Successful", tools=TOOLS)
-active_owner_success_p.line(x='x', y='owner_success', source=rolling_data_source, color=brewer['Dark2'][7][5], line_width=2)
-active_owner_success_p.yaxis.formatter = NumeralTickFormatter(format="0%")
-active_owner_success_p.add_tools(HoverTool(line_policy='next', tooltips=[
-        ('Success Rate', '@owner_success{0.00%}'),
-        ('Date',  '@datestr'),]
-    , mode='vline')
-)
-
-nh_plots_title_map = {
-    'assignments_per_owner': 'Assignments Per Owner',
-    'apps_per_assignment': 'Number Of Applications Per Assignment',
-    'confirmation_rate': 'Confirmation Rate',
-    'sits_per_sitter': 'Sits Per Sitter'}
-
-nh_plots = []
-
-# Plot all ColumnDataSource values
-for c, col in enumerate(['assignments_per_owner', 'apps_per_assignment', 'confirmation_rate', 'sits_per_sitter']):
-    fig = figure(title=nh_plots_title_map[col], plot_height=250, plot_width=500, x_axis_type='datetime', tools=TOOLS)
-    fig.line(x='x', y=col, source=rolling_data_source, color=brewer['Dark2'][7][c], line_width=1)
-    nh_plots.append(fig)
-
-nh_plots[2].yaxis.formatter = NumeralTickFormatter(format="0%")
-
-active_member_ratio_p = figure(title="Active Member Ratio", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Ratio", tools=TOOLS)
-active_member_ratio_p.line(x='x', y='member_ratio', source=rolling_data_source, color=brewer['Dark2'][7][6], line_width=2)
-active_member_ratio_p.add_tools(HoverTool(line_policy='next', tooltips=[
-        ('Ratio', '@member_ratio'),
-        ('Date',  '@datestr'),]
-    , mode='vline')
-)
+active_sitter_success_p, active_owner_success_p, nh_plots, active_member_ratio_p = visualise_network_health()
 
 nh_layout = column(active_sitter_success_p, active_owner_success_p, gridplot(nh_plots, ncols=2), active_member_ratio_p)
 
@@ -518,10 +538,6 @@ tab4 = Panel(child=nh_layout, title="Network Health")
 
 # Layout of tabs for the whole dashboard
 tabs = [tab1, tab2, tab3, tab4]
-
-# Add tabs to curdoc
-# curdoc().add_root(Tabs(tabs=tabs))
-# curdoc().title = "Membership Growth & Ratio"
 
 # Index page, no args
 @app.route('/')

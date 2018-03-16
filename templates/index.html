@@ -15,6 +15,19 @@
 <body>
 <H1>Network Health Dashboard</H1>
 
+<form action="/">
+<select name="country">
+	{% for country in country_options %}
+		{% if country == "All" %}
+			<option selected value="{{ country }}">{{ country }}</option> 
+		{% else %} 
+			<option value="{{ country }}">{{ country }}</option> 
+		{% endif %}
+	{% endfor %}
+</select>
+<input type="submit">
+</form>
+
 
 {{ script|safe }}
 {{ div|safe }}
