@@ -13,6 +13,8 @@ pandas = "*"
 pytz = "*"
 flask = "*"
 flask-httpauth = "*"
+dotenv = "*"
+python-dotenv = "*"
 
 
 [dev-packages]
