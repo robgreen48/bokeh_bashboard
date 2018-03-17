@@ -17,8 +17,8 @@
 
 <form action="/">
 <select name="country">
-	{% for country in country_options %}
-		{% if country == "All" %}
+	{% for country in country_names %}
+		{% if country == current_country %}
 			<option selected value="{{ country }}">{{ country }}</option> 
 		{% else %} 
 			<option value="{{ country }}">{{ country }}</option> 
