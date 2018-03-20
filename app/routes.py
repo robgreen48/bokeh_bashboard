@@ -13,7 +13,7 @@ from bokeh.plotting import figure, show
 from bokeh.layouts import row, column, widgetbox, gridplot
 from bokeh.models import ColumnDataSource, DatetimeTickFormatter, NumeralTickFormatter, HoverTool
 from bokeh.palettes import brewer
-from bokeh.models.widgets import Select, Div, Panel, Tabs
+from bokeh.models.widgets import Select, Div, Panel
 from bokeh.embed import components
 
 # Global settings
@@ -433,6 +433,7 @@ def visualise_network_health(source):
     )
 
     return p1, p2, plots, p3
+
 # Index page, no args
 @app.route('/')
 @auth.login_required
@@ -454,16 +455,43 @@ def index():
     # Set up layouts and add to tab1
     growth_inputs = row(a_number)
     growth_layout = column(growth_inputs, growth_plot, ratio_plot, width=1200)
-    tab1 = Panel(child=growth_layout, title="Membership Growth")
+
+    script, div = components(growth_layout)
+    return render_template("index.html", title='Home', script=script, div=div, country_names=COUNTRY_OPTIONS, current_country=current_country)
+
+# Sitter page, no args
+@app.route('/sitter-onboarding')
+@auth.login_required
+def sitter_onboarding():
+
+     # Look for country in the URL
+    current_country = request.args.get("country")
+    if current_country == None:
+        current_country = "All"
 
     # Create sitter onboarding datasource and plots
     apps, onboarding_sitters = manipulate_sitters_apps(current_country)
     sitter_onboarding_source = ColumnDataSource(data=create_sitter_onboarding_source(onboarding_sitters))
     so_success_plot, so_plots = visualise_sitter_onboarding(sitter_onboarding_source)
 
-    # Set up layouts and add to tab2
+    # Set up layout
     sitter_onb_layout = column(so_success_plot, gridplot(so_plots, ncols=2))
-    tab2 = Panel(child=sitter_onb_layout, title="Sitter Onboarding")
+
+    script, div = components(sitter_onb_layout)
+    return render_template("sitter-onboarding.html", title='New Sitters', script=script, div=div, country_names=COUNTRY_OPTIONS, current_country=current_country)
+
+# Owner page, no args
+@app.route('/owner-onboarding')
+@auth.login_required
+def owner_onboarding():
+
+     # Look for country in the URL
+    current_country = request.args.get("country")
+    if current_country == None:
+        current_country = "All"
+
+    # get apps data
+    apps, onboarding_sitters = manipulate_sitters_apps(current_country)
 
     # Create owner onboarding datasource and plots
     asgnmts, relevant_assignments, owners = manipulate_owner_assignments(apps, current_country)
@@ -472,7 +500,25 @@ def index():
 
     # Set up layouts and add to tab3
     oo_layout = column(oo_success_plot, gridplot(oo_plots, ncols=2))
-    tab3 = Panel(child=oo_layout, title="Owner Onboarding")
+
+    script, div = components(oo_layout)
+    return render_template("owner-onboarding.html", title='New Owners', script=script, div=div, country_names=COUNTRY_OPTIONS, current_country=current_country)
+
+# Network Health page, no args
+@app.route('/net-health')
+@auth.login_required
+def net_health():
+
+     # Look for country in the URL
+    current_country = request.args.get("country")
+    if current_country == None:
+        current_country = "All"
+
+    # get apps data
+    apps, onboarding_sitters = manipulate_sitters_apps(current_country)
+
+    #Get asgnmts
+    asgnmts, relevant_assignments, owners = manipulate_owner_assignments(apps, current_country)
 
     # Create rolling datasource and plots
     nh_applications, nh_assignments, nh_index = manipulate_full_data(asgnmts, apps)
@@ -482,10 +528,6 @@ def index():
 
     # Set up layouts and add to tab4
     nh_layout = column(active_sitter_success_p, active_owner_success_p, gridplot(nh_plots, ncols=2), active_member_ratio_p)
-    tab4 = Panel(child=nh_layout, title="Network Health")
 
-    # Layout of tabs
-    tabs = [tab1, tab2, tab3, tab4]
-
-    script, div = components(Tabs(tabs=tabs))
-    return render_template("index.html", title='Home', script=script, div=div, country_names=COUNTRY_OPTIONS, current_country=current_country)
+    script, div = components(nh_layout)
+    return render_template("net-health.html", title='Network Health', script=script, div=div, country_names=COUNTRY_OPTIONS, current_country=current_country)
