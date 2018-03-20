@@ -1,5 +1,5 @@
-from flask import Flask, render_template, request
-from flask_httpauth import HTTPBasicAuth
+from flask import render_template, flash, redirect, url_for, request
+from app import app, auth
 
 import numpy as np
 import pandas as pd
@@ -16,21 +16,6 @@ from bokeh.palettes import brewer
 from bokeh.models.widgets import Select, Div, Panel, Tabs
 from bokeh.embed import components
 
-import settings
-
-app = Flask(__name__)
-auth = HTTPBasicAuth()
-
-users = {
-    settings.GLOBALUSER: settings.GLOBALPASS
-}
-
-@auth.get_password
-def get_pw(username):
-    if username in users:
-        return users.get(username)
-    return None
-
 # Global settings
 TOOLS = "pan,wheel_zoom,box_zoom,reset"
 REPORT_START = '01-Jan-2016' # Earliest point for all plots
@@ -40,7 +25,7 @@ COUNTRY_OPTIONS = ["All", "United Kingdom", "United States", "Australia", "Canad
 
 ## Growth data manipulation ##
 def manipulate_numactive(country):
-    member_numbers = pd.read_csv('data_files/180301-num-active.csv', parse_dates=(['period']))
+    member_numbers = pd.read_csv('app/data_files/180301-num-active.csv', parse_dates=(['period']))
     member_numbers = (member_numbers.groupby(['period', 'country', 'membership_type'])['num_active']
             .sum()
             .unstack() # unstack the membership_type column
@@ -121,8 +106,8 @@ def generate_counts_html(source):
 ### Sitter success data manipulation ###
 
 def manipulate_sitters_apps(country):
-    apps = pd.read_csv('data_files/180301-applications.csv', parse_dates=['date_created', 'last_modified'])
-    sitters = pd.read_csv('data_files/180301-sitters.csv', parse_dates=['fst_start_date', 'start_date', 'expires_date'])
+    apps = pd.read_csv('app/data_files/180301-applications.csv', parse_dates=['date_created', 'last_modified'])
+    sitters = pd.read_csv('app/data_files/180301-sitters.csv', parse_dates=['fst_start_date', 'start_date', 'expires_date'])
 
     apps = pd.merge(
         apps,
@@ -224,14 +209,14 @@ def visualise_sitter_onboarding(source):
 ### Owner success data manipulation ###
 
 def manipulate_owner_assignments(apps, country):
-    asgnmts = pd.read_csv('data_files/180301-assignments.csv', parse_dates=['created_date', 'start_date', 'end_date'])
+    asgnmts = pd.read_csv('app/data_files/180301-assignments.csv', parse_dates=['created_date', 'start_date', 'end_date'])
     asgnmts['is_assignment_filled'] = asgnmts.sid.notnull()
 
     app_count = apps.groupby('assignment_id')['req_type'].count()
     asgnmts.set_index('aid', inplace=True)
     asgnmts['nb_applications'] = app_count
 
-    owners = pd.read_csv('data_files/180301-owners.csv', parse_dates=['joined_date', 'fst_start_date', 'start_date', 'expires_date', 'published_date'])
+    owners = pd.read_csv('app/data_files/180301-owners.csv', parse_dates=['joined_date', 'fst_start_date', 'start_date', 'expires_date', 'published_date'])
     assignments_impr = pd.merge(asgnmts,
                                 owners[['user_id','billing_country', 'fst_start_date']],
                                 left_on='ouser_id', right_on='user_id')
@@ -448,8 +433,6 @@ def visualise_network_health(source):
     )
 
     return p1, p2, plots, p3
-
-
 # Index page, no args
 @app.route('/')
 @auth.login_required
@@ -505,9 +488,4 @@ def index():
     tabs = [tab1, tab2, tab3, tab4]
 
     script, div = components(Tabs(tabs=tabs))
-    return render_template("index.html", script=script, div=div, country_names=COUNTRY_OPTIONS, current_country=current_country)
-
-# With debug=True, Flask server will auto-reload 
-# when there are code changes
-if __name__ == '__main__':
-    app.run(port=5000, debug=True)
+    return render_template("index.html", title='Home', script=script, div=div, country_names=COUNTRY_OPTIONS, current_country=current_country)

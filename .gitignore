@@ -99,6 +99,7 @@ ENV/
 
 # mypy
 .mypy_cache/
+/app/data_files/
 /data_files/
 .env
 .env
