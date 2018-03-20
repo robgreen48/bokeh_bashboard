@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block content %}
+{% block app_content %}
 
 	<form action="/">
 	<select name="country">
@@ -15,7 +15,10 @@
 	<input type="submit">
 	</form>
 
-	{{ script|safe }}
-	{{ div|safe }}
+	
+    <script src="http://cdn.pydata.org/bokeh/release/bokeh-0.12.14.min.js"></script>
+    <script src="http://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.14.min.js"></script>
+    {{ script|safe }}
+    {{ div|safe }}
 
 {% endblock %}

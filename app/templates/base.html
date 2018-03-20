@@ -1,22 +1,17 @@
-<html>
-<head>
-	{% if title %}
-    <title>{{ title }} - Network Health Dashboard</title>
-    {% else %}
-    <title>Network Health Dashboard</title>
-    {% endif %}
-<link
-    href="http://cdn.pydata.org/bokeh/release/bokeh-0.12.14.min.css"
-    rel="stylesheet" type="text/css">
-<link
-    href="http://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.14.min.css"
-    rel="stylesheet" type="text/css">
+{% extends 'bootstrap/base.html' %}
 
-<script src="http://cdn.pydata.org/bokeh/release/bokeh-0.12.14.min.js"></script>
-<script src="http://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.14.min.js"></script>
+{% block title %}
+    {% if title %}{{ title }} - Network Health {% else %}Network Health Dashboard{% endif %}
+{% endblock %}
 
-</head>
-<body>
+
+{% block styles %}
+	  <link rel="stylesheet" href="http://cdn.pydata.org/bokeh/release/bokeh-0.12.14.min.css">
+	  <link rel="stylesheet" href="http://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.14.min.css">
+	  {{super()}}
+{% endblock %}
+
+{% block navbar %}
 	<nav class="navbar navbar-default">
 	  <div class="container-fluid">
 	    <!-- Brand and toggle get grouped for better mobile display -->
@@ -41,11 +36,11 @@
 	    </div><!-- /.navbar-collapse -->
 	  </div><!-- /.container-fluid -->
 	</nav>
+{% endblock %}
 
+{% block content %}
+	<H1>Network Health Dashboard</H1>
 
-<H1>Network Health Dashboard</H1>
+	{% block app_content %}{% endblock %}
 
-{% block content %}{% endblock %}
-
-</body>
-</html>
+{% endblock %}
