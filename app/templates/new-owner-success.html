@@ -2,7 +2,7 @@
 
 {% block app_content %}
 
-	<form action="/owner-onboarding">
+	<form action="/new-owner-success">
 	<select name="country">
 		{% for country in country_names %}
 			{% if country == current_country %}
@@ -14,8 +14,8 @@
 	</select>
 	<input type="submit">
 	</form>
-
-	<script src="http://cdn.pydata.org/bokeh/release/bokeh-0.12.14.min.js"></script>
+	
+    <script src="http://cdn.pydata.org/bokeh/release/bokeh-0.12.14.min.js"></script>
     <script src="http://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.14.min.js"></script>
     {{ script|safe }}
     {{ div|safe }}

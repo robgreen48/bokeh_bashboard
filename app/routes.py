@@ -79,18 +79,6 @@ def create_ratio_source(data):
         datestr=[d.strftime("%d-%m-%Y") for d in data.period])
     return source
 
-def visualise_ratio(source):
-    p = figure(title="Membership Ratio (Sitters:Owners)", plot_height=300, plot_width=1000, x_axis_type='datetime', y_range=(0,12), y_axis_label="Ratio", tools=TOOLS)
-    p.square(x='x', y='y', source=source, color="#2222aa", fill_color=None, line_width=1)
-    p.line(x='x', y='y', source=source, color="#2222aa", line_width=1)
-    p.add_tools(HoverTool(line_policy='next', tooltips=[
-            ('Ratio', '@y'),
-            ('Date',  '@datestr'),]
-        , mode='vline')
-    )
-
-    return p
-
 def generate_counts_html(source):
 
     last_count = (source.data['Owners'].shape[0]) - 1
@@ -175,37 +163,6 @@ def create_sitter_onboarding_source(data):
 
     return source
 
-
-def visualise_sitter_onboarding(source):
-    title_map = {
-        'nb_applications': 'New Sitter Applications',
-        'confirmed_sits': 'Confirmed Sits',
-        'percent_inactive': 'New Sitter Inactivity',
-        'num_sitters': 'Number Of New Sitters'}
-
-    p = figure(title="New Sitter Success", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Percent Successful", tools=TOOLS)
-    p.square(x='x', y='is_successful', source=source, color="#2222aa", fill_color=None, line_width=1)
-    p.line(x='x', y='is_successful', source=source, color="#2222aa", line_width=1)
-    p.yaxis.formatter = NumeralTickFormatter(format="0%")
-    p.add_tools(HoverTool(line_policy='next', tooltips=[
-            ('Success Rate', '@is_successful{0.00%}'),
-            ('Date',  '@datestr'),]
-        , mode='vline')
-    )
-    
-    plots = []
-
-    # Plot all ColumnDataSource values
-    for c, col in enumerate(['nb_applications', 'confirmed_sits', 'percent_inactive', 'num_sitters']):
-        fig = figure(title=title_map[col], plot_height=250, plot_width=500, x_axis_type='datetime', tools=TOOLS)
-        fig.line(x='x', y=col, source=source, color=brewer['Dark2'][5][c], line_width=1)
-        plots.append(fig)
-
-    plots[2].yaxis.formatter = NumeralTickFormatter(format="0%")
-
-    return p, plots
-
-
 ### Owner success data manipulation ###
 
 def manipulate_owner_assignments(apps, country):
@@ -284,37 +241,6 @@ def create_owner_onboarding_source(owner_data, assignment_data):
 
     return source
 
-
-def visualise_owner_onboarding(source):
-    title_map = {
-        'nb_assignments': 'New Owner Assignments',
-        'percent_inactive': 'New Owner Inactivity',
-        'nb_owners': 'Number Of New Owners',
-        'confirmation_rate': 'New Owner Confirmation Rate'}
-
-    p = figure(title="New Owner Success", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Percent Successful", tools=TOOLS)
-    p.square(x='x', y='is_successful', source=source, color="#2222aa", fill_color=None, line_width=1)
-    p.line(x='x', y='is_successful', source=source, color="#2222aa", line_width=1)
-    p.yaxis.formatter = NumeralTickFormatter(format="0%")
-    p.add_tools(HoverTool(line_policy='next', tooltips=[
-            ('Success Rate', '@is_successful{0.00%}'),
-            ('Date',  '@datestr'),]
-        , mode='vline')
-    )
-
-    plots = []
-
-    # Plot all ColumnDataSource values
-    for c, col in enumerate(['nb_assignments', 'percent_inactive', 'nb_owners', 'confirmation_rate']):
-        fig = figure(title=title_map[col], plot_height=250, plot_width=500, x_axis_type='datetime', tools=TOOLS)
-        fig.line(x='x', y=col, source=source, color=brewer['Dark2'][6][c], line_width=1)
-        plots.append(fig)
-
-    plots[1].yaxis.formatter = NumeralTickFormatter(format="0%")
-    plots[3].yaxis.formatter = NumeralTickFormatter(format="0%")
-
-    return p, plots
-
 ### Network Health data manipulation ###
 
 def manipulate_full_data(asgnmts, apps):
@@ -388,56 +314,44 @@ def create_rolling_data_source(data):
 
     return source
 
-def visualise_network_health(source):
+def visualise(source, field_list, title_list, axis_list, format_list, percent_list):
 
-    p1 = figure(title="Active Sitter Success", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Percent Successful", tools=TOOLS)
-    p1.line(x='x', y='sitter_success', source=source, color=brewer['Dark2'][7][4], line_width=2)
-    p1.yaxis.formatter = NumeralTickFormatter(format="0%")
-    p1.add_tools(HoverTool(line_policy='next', tooltips=[
-            ('Success Rate', '@sitter_success{0.00%}'),
-            ('Date',  '@datestr'),]
-        , mode='vline')
-    )
+    plots = [] # new list for all plots
 
-    p2 = figure(title="Active Owner Success", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Percent Successful", tools=TOOLS)
-    p2.line(x='x', y='owner_success', source=source, color=brewer['Dark2'][7][5], line_width=2)
-    p2.yaxis.formatter = NumeralTickFormatter(format="0%")
-    p2.add_tools(HoverTool(line_policy='next', tooltips=[
-            ('Success Rate', '@owner_success{0.00%}'),
-            ('Date',  '@datestr'),]
-        , mode='vline')
-    )
+    # loop through the list of plot settings
+    for field, title, label, format, percent in zip(field_list, title_list, axis_list, format_list, percent_list):
 
-    title_map = {
-        'assignments_per_owner': 'Assignments Per Owner',
-        'apps_per_assignment': 'Number Of Applications Per Assignment',
-        'confirmation_rate': 'Confirmation Rate',
-        'sits_per_sitter': 'Sits Per Sitter'}
+        tooltip = '@'+field+format # create the tooltip
 
-    plots = []
+        p = figure(title=title, plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label=label, tools=TOOLS)
+        p.line(x='x', y=field, source=source, color=brewer['Dark2'][7][4], line_width=2)
+        p.add_tools(HoverTool(line_policy='next', tooltips=[
+                (label, tooltip),
+                ('Date',  '@datestr'),]
+            , mode='vline')
+        )
 
-    # Plot all ColumnDataSource values
-    for c, col in enumerate(['assignments_per_owner', 'apps_per_assignment', 'confirmation_rate', 'sits_per_sitter']):
-        fig = figure(title=title_map[col], plot_height=250, plot_width=500, x_axis_type='datetime', tools=TOOLS)
-        fig.line(x='x', y=col, source=source, color=brewer['Dark2'][7][c], line_width=1)
-        plots.append(fig)
+        # format y axis as percentage if neccessary
+        if(percent == True):
+            p.yaxis.formatter = NumeralTickFormatter(format="0%")
 
-    plots[2].yaxis.formatter = NumeralTickFormatter(format="0%")
+        plots.append(p)
 
-    p3 = figure(title="Active Member Ratio", plot_height=300, plot_width=1000, x_axis_type='datetime', y_axis_label="Ratio", tools=TOOLS)
-    p3.line(x='x', y='member_ratio', source=source, color=brewer['Dark2'][7][6], line_width=2)
-    p3.add_tools(HoverTool(line_policy='next', tooltips=[
-            ('Ratio', '@member_ratio'),
-            ('Date',  '@datestr'),]
-        , mode='vline')
-    )
+    return plots
 
-    return p1, p2, plots, p3
 
 # Index page, no args
 @app.route('/')
 @auth.login_required
 def index():
+
+    return render_template("index.html", title='Home')
+
+
+# Membership Growth page, no args
+@app.route('/membership-growth')
+@auth.login_required
+def membership_growth():
 
     # Look for country in the URL
     current_country = request.args.get("country")
@@ -448,23 +362,62 @@ def index():
     all_members = manipulate_numactive(current_country)
     growth_source = ColumnDataSource(data=create_growth_source(all_members))
     growth_plot = visualise_growth(growth_source)
+    a_number = Div(text=generate_counts_html(growth_source), width=200, height=100)
+
+    # Set up layouts
+    growth_inputs = row(a_number)
+    growth_layout = column(growth_inputs, growth_plot, width=1200)
+
+    script, div = components(growth_layout)
+    return render_template("membership-growth.html",
+        title='Membership Growth',
+        script=script, div=div,
+        country_names=COUNTRY_OPTIONS,
+        current_country=current_country)
+
+# Membership Growth page, no args
+@app.route('/membership-ratio')
+@auth.login_required
+def membership_ratio():
+
+    # Look for country in the URL
+    current_country = request.args.get("country")
+    if current_country == None:
+        current_country = "All"
+
+    # Create the growth DataSources and plot
+    all_members = manipulate_numactive(current_country)
     ratio_source = ColumnDataSource(data=create_ratio_source(all_members))
-    ratio_plot = visualise_ratio(ratio_source)
+    
+    var_list = ['y']
+    title_list = ['Membership Ratio']
+    axis_labels = ['Ratio']
+    number_formats = ['{0.00}']
+    is_percents = [False]
+
+    plots = visualise(ratio_source, var_list, title_list, axis_labels, number_formats, is_percents)
+
+    growth_source = ColumnDataSource(data=create_growth_source(all_members))
     a_number = Div(text=generate_counts_html(growth_source), width=200, height=100)
 
     # Set up layouts and add to tab1
-    growth_inputs = row(a_number)
-    growth_layout = column(growth_inputs, growth_plot, ratio_plot, width=1200)
+    #growth_inputs = row(a_number)
+    growth_layout = column(plots)
 
     script, div = components(growth_layout)
-    return render_template("index.html", title='Home', script=script, div=div, country_names=COUNTRY_OPTIONS, current_country=current_country)
+    return render_template("membership-ratio.html",
+        title='Membership Ratio',
+        script=script,
+        div=div,
+        country_names=COUNTRY_OPTIONS,
+        current_country=current_country)
 
-# Sitter page, no args
-@app.route('/sitter-onboarding')
+# New sitter success page, no args
+@app.route('/new-sitter-success')
 @auth.login_required
-def sitter_onboarding():
+def new_sitter_success():
 
-     # Look for country in the URL
+    # Look for country in the URL
     current_country = request.args.get("country")
     if current_country == None:
         current_country = "All"
@@ -472,18 +425,96 @@ def sitter_onboarding():
     # Create sitter onboarding datasource and plots
     apps, onboarding_sitters = manipulate_sitters_apps(current_country)
     sitter_onboarding_source = ColumnDataSource(data=create_sitter_onboarding_source(onboarding_sitters))
-    so_success_plot, so_plots = visualise_sitter_onboarding(sitter_onboarding_source)
+    
+    var_list = ['is_successful', 'confirmed_sits']
+    title_list = ['Active Sitter Success', 'Sits Per Sitter']
+    axis_labels = ['Success rate', 'Sits']
+    number_formats = ['{0%}', '{0.00}']
+    is_percents = [True, False]
+
+    plots = visualise(sitter_onboarding_source, var_list, title_list, axis_labels, number_formats, is_percents)
 
     # Set up layout
-    sitter_onb_layout = column(so_success_plot, gridplot(so_plots, ncols=2))
+    sitter_onb_layout = column(plots)
 
     script, div = components(sitter_onb_layout)
-    return render_template("sitter-onboarding.html", title='New Sitters', script=script, div=div, country_names=COUNTRY_OPTIONS, current_country=current_country)
+    return render_template("new-sitter-success.html",
+        title='New Sitter Success',
+        script=script,
+        div=div,
+        country_names=COUNTRY_OPTIONS,
+        current_country=current_country)
 
-# Owner page, no args
-@app.route('/owner-onboarding')
+# New sitter activity page, no args
+@app.route('/new-sitter-activity')
 @auth.login_required
-def owner_onboarding():
+def new_sitter_activity():
+
+    # Look for country in the URL
+    current_country = request.args.get("country")
+    if current_country == None:
+        current_country = "All"
+
+    # Create sitter onboarding datasource and plots
+    apps, onboarding_sitters = manipulate_sitters_apps(current_country)
+    sitter_onboarding_source = ColumnDataSource(data=create_sitter_onboarding_source(onboarding_sitters))
+    
+    var_list = ['nb_applications', 'percent_inactive']
+    title_list = ['New Sitter Applications', 'New Sitter Inactivity']
+    axis_labels = ['Applications', 'Percent Inactive']
+    number_formats = ['{0}', '{0%}']
+    is_percents = [False, True]
+
+    plots = visualise(sitter_onboarding_source, var_list, title_list, axis_labels, number_formats, is_percents)
+
+    # Set up layout
+    sitter_onb_layout = column(plots)
+
+    script, div = components(sitter_onb_layout)
+    return render_template("new-sitter-activity.html",
+        title='New Sitter Activity',
+        script=script,
+        div=div,
+        country_names=COUNTRY_OPTIONS,
+        current_country=current_country)
+
+# New sitter activity page, no args
+@app.route('/new-sitter-volume')
+@auth.login_required
+def new_sitter_volume():
+
+    # Look for country in the URL
+    current_country = request.args.get("country")
+    if current_country == None:
+        current_country = "All"
+
+    # Create sitter onboarding datasource and plots
+    apps, onboarding_sitters = manipulate_sitters_apps(current_country)
+    sitter_onboarding_source = ColumnDataSource(data=create_sitter_onboarding_source(onboarding_sitters))
+    
+    var_list = ['num_sitters']
+    title_list = ['New Sitters']
+    axis_labels = ['Sitters']
+    number_formats = ['{0}']
+    is_percents = [False]
+
+    plots = visualise(sitter_onboarding_source, var_list, title_list, axis_labels, number_formats, is_percents)
+
+    # Set up layout
+    sitter_onb_layout = column(plots)
+
+    script, div = components(sitter_onb_layout)
+    return render_template("new-sitter-volume.html",
+        title='New Sitter Volume',
+        script=script,
+        div=div,
+        country_names=COUNTRY_OPTIONS,
+        current_country=current_country)
+
+# New Owner success page, no args
+@app.route('/new-owner-success')
+@auth.login_required
+def new_owner_success():
 
      # Look for country in the URL
     current_country = request.args.get("country")
@@ -496,20 +527,104 @@ def owner_onboarding():
     # Create owner onboarding datasource and plots
     asgnmts, relevant_assignments, owners = manipulate_owner_assignments(apps, current_country)
     owner_onboarding_source = ColumnDataSource(data=create_owner_onboarding_source(owners, relevant_assignments))
-    oo_success_plot, oo_plots = visualise_owner_onboarding(owner_onboarding_source)
+    
+    var_list = ['is_successful', 'confirmation_rate']
+    title_list = ['New Owner Success', 'New Owner Confirmation Rate']
+    axis_labels = ['Success rate', 'Confirmation rate']
+    number_formats = ['{0%}', '{0%}']
+    is_percents = [True, True]
+
+    plots = visualise(owner_onboarding_source, var_list, title_list, axis_labels, number_formats, is_percents)
 
     # Set up layouts and add to tab3
-    oo_layout = column(oo_success_plot, gridplot(oo_plots, ncols=2))
+    oo_layout = column(plots)
 
     script, div = components(oo_layout)
-    return render_template("owner-onboarding.html", title='New Owners', script=script, div=div, country_names=COUNTRY_OPTIONS, current_country=current_country)
+    return render_template("new-owner-success.html",
+        title='New Owner Success',
+        script=script,
+        div=div,
+        country_names=COUNTRY_OPTIONS,
+        current_country=current_country)
 
-# Network Health page, no args
-@app.route('/net-health')
+# New Owner success page, no args
+@app.route('/new-owner-activity')
 @auth.login_required
-def net_health():
+def new_owner_activity():
 
      # Look for country in the URL
+    current_country = request.args.get("country")
+    if current_country == None:
+        current_country = "All"
+
+    # get apps data
+    apps, onboarding_sitters = manipulate_sitters_apps(current_country)
+
+    # Create owner onboarding datasource and plots
+    asgnmts, relevant_assignments, owners = manipulate_owner_assignments(apps, current_country)
+    owner_onboarding_source = ColumnDataSource(data=create_owner_onboarding_source(owners, relevant_assignments))
+    
+    var_list = ['nb_assignments', 'percent_inactive']
+    title_list = ['New Owner Assignments', 'New Owner Inactivity']
+    axis_labels = ['Assignments', 'Percent Inactive']
+    number_formats = ['{0}', '{0%}']
+    is_percents = [False, True]
+
+    plots = visualise(owner_onboarding_source, var_list, title_list, axis_labels, number_formats, is_percents)
+
+    # Set up layouts and add to tab3
+    oo_layout = column(plots)
+
+    script, div = components(oo_layout)
+    return render_template("new-owner-activity.html",
+        title='New Owner Activity',
+        script=script,
+        div=div,
+        country_names=COUNTRY_OPTIONS,
+        current_country=current_country)
+
+# New Owner success page, no args
+@app.route('/new-owner-volume')
+@auth.login_required
+def new_owner_volume():
+
+     # Look for country in the URL
+    current_country = request.args.get("country")
+    if current_country == None:
+        current_country = "All"
+
+    # get apps data
+    apps, onboarding_sitters = manipulate_sitters_apps(current_country)
+
+    # Create owner onboarding datasource and plots
+    asgnmts, relevant_assignments, owners = manipulate_owner_assignments(apps, current_country)
+    owner_onboarding_source = ColumnDataSource(data=create_owner_onboarding_source(owners, relevant_assignments))
+    
+    var_list = ['nb_owners']
+    title_list = ['New Owners']
+    axis_labels = ['Owners']
+    number_formats = ['{0}']
+    is_percents = [False]
+
+    plots = visualise(owner_onboarding_source, var_list, title_list, axis_labels, number_formats, is_percents)
+
+    # Set up layouts and add to tab3
+    oo_layout = column(plots)
+
+    script, div = components(oo_layout)
+    return render_template("new-owner-volume.html",
+        title='New Owner Volume',
+        script=script,
+        div=div,
+        country_names=COUNTRY_OPTIONS,
+        current_country=current_country)
+
+# Active sitter page, no args
+@app.route('/active-sitter-success')
+@auth.login_required
+def active_sitter_success():
+
+    # Look for country in the URL
     current_country = request.args.get("country")
     if current_country == None:
         current_country = "All"
@@ -524,10 +639,94 @@ def net_health():
     nh_applications, nh_assignments, nh_index = manipulate_full_data(asgnmts, apps)
     rolling_data = calculate_rolling(nh_applications, nh_assignments, nh_index)
     rolling_data_source = ColumnDataSource(data=create_rolling_data_source(rolling_data))
-    active_sitter_success_p, active_owner_success_p, nh_plots, active_member_ratio_p = visualise_network_health(rolling_data_source)
+    
+    var_list = ['sitter_success', 'sits_per_sitter']
+    title_list = ['Active Sitter Success', 'Sits Per Active Sitter']
+    axis_labels = ['Success rate', 'Sits']
+    number_formats = ['{0%}', '{0.00}']
+    is_percents = [True, False]
 
-    # Set up layouts and add to tab4
-    nh_layout = column(active_sitter_success_p, active_owner_success_p, gridplot(nh_plots, ncols=2), active_member_ratio_p)
+    plots = visualise(rolling_data_source, var_list, title_list, axis_labels, number_formats, is_percents)
+
+    nh_layout = column(plots)
 
     script, div = components(nh_layout)
-    return render_template("net-health.html", title='Network Health', script=script, div=div, country_names=COUNTRY_OPTIONS, current_country=current_country)
+    return render_template("active-sitter-success.html",
+        title='Active Sitter Success',
+        script=script,
+        div=div)
+
+# Active owner page, no args
+@app.route('/active-owner-success')
+@auth.login_required
+def active_owner_success():
+
+    # Look for country in the URL
+    current_country = request.args.get("country")
+    if current_country == None:
+        current_country = "All"
+
+    # get apps data
+    apps, onboarding_sitters = manipulate_sitters_apps(current_country)
+
+    #Get asgnmts
+    asgnmts, relevant_assignments, owners = manipulate_owner_assignments(apps, current_country)
+
+    # Create rolling datasource and plots
+    nh_applications, nh_assignments, nh_index = manipulate_full_data(asgnmts, apps)
+    rolling_data = calculate_rolling(nh_applications, nh_assignments, nh_index)
+    rolling_data_source = ColumnDataSource(data=create_rolling_data_source(rolling_data))
+    
+    var_list = ['owner_success', 'confirmation_rate']
+    title_list = ['Active Owner Success', 'Confirmation Rate']
+    axis_labels = ['Success rate', 'Confirmation rate']
+    number_formats = ['{0%}', '{0%}']
+    is_percents = [True, True]
+
+    plots = visualise(rolling_data_source, var_list, title_list, axis_labels, number_formats, is_percents)
+
+    nh_layout = column(plots)
+
+    script, div = components(nh_layout)
+    return render_template("active-owner-success.html",
+        title='Active Owner Success',
+        script=script,
+        div=div)
+
+# Active owner page, no args
+@app.route('/active-member-ratio')
+@auth.login_required
+def active_member_ratio():
+
+    # Look for country in the URL
+    current_country = request.args.get("country")
+    if current_country == None:
+        current_country = "All"
+
+    # get apps data
+    apps, onboarding_sitters = manipulate_sitters_apps(current_country)
+
+    #Get asgnmts
+    asgnmts, relevant_assignments, owners = manipulate_owner_assignments(apps, current_country)
+
+    # Create rolling datasource and plots
+    nh_applications, nh_assignments, nh_index = manipulate_full_data(asgnmts, apps)
+    rolling_data = calculate_rolling(nh_applications, nh_assignments, nh_index)
+    rolling_data_source = ColumnDataSource(data=create_rolling_data_source(rolling_data))
+
+    var_list = ['member_ratio']
+    title_list = ['Active Member Ratio']
+    axis_labels = ['Ratio']
+    number_formats = ['{0.00}']
+    is_percents = [False]
+
+    plots = visualise(rolling_data_source, var_list, title_list, axis_labels, number_formats, is_percents)
+
+    # Set up layouts and add to tab4
+    nh_layout = column(plots)
+
+    script, div = components(nh_layout)
+    return render_template("active-member-ratio.html",
+        title='Active Member Ratio',
+        script=script,
+        div=div)

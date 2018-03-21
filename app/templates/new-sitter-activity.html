@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block app_content %}
+
+	<form action="/new-sitter-activity">
+	<select name="country">
+		{% for country in country_names %}
+			{% if country == current_country %}
+				<option selected value="{{ country }}">{{ country }}</option> 
+			{% else %} 
+				<option value="{{ country }}">{{ country }}</option> 
+			{% endif %}
+		{% endfor %}
+	</select>
+	<input type="submit">
+	</form>
+	
+    <script src="http://cdn.pydata.org/bokeh/release/bokeh-0.12.14.min.js"></script>
+    <script src="http://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.14.min.js"></script>
+    {{ script|safe }}
+    {{ div|safe }}
+
+{% endblock %}

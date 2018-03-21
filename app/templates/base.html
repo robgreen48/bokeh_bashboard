@@ -26,54 +26,48 @@
 	    </div>
 
 	    <!-- Collect the nav links, forms, and other content for toggling -->
-	    <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+<!-- 	    <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
 	      <ul class="nav navbar-nav">
-	        <li class="active"><a href="/">Our Membership <span class="sr-only">(current)</span></a></li>
+	        <li><a href="/">Our Membership <span class="sr-only">(current)</span></a></li>
 	        <li><a href="/sitter-onboarding">Sitter Onboarding</a></li>
 	        <li><a href="/owner-onboarding">Owner Onboarding</a></li>
 	        <li><a href="/net-health">Network Health</a></li>
 	      </ul>
-	    </div><!-- /.navbar-collapse -->
+	    </div> /.navbar-collapse -->
 	  </div><!-- /.container-fluid -->
 	</nav>
 {% endblock %}
 
 {% block content %}
-
 	<div class="container-fluid">
-      
       <div class="row">
-        
         <div class="col-md-3">
           <!-- <div class="well sidebar-nav"> -->
             <ul class="nav nav-list">
               <li class="nav-header">Membership</li>
-              <li class="active"><a href="#">Membership Growth</a></li>
-              <li><a href="#">Member Ratios</a></li>
+              <li class="active"><a href="/membership-growth">Membership Growth</a></li>
+              <li><a href="/membership-ratio">Member Ratios</a></li>
               <li class="nav-header">New Sitters</li>
-              <li><a href="#">Success</a></li>
-              <li><a href="#">Activity</a></li>
-              <li><a href="#">Volume</a></li>
+              <li><a href="/new-sitter-success">Success</a></li>
+              <li><a href="/new-sitter-activity">Activity</a></li>
+              <li><a href="/new-sitter-volume">Volume</a></li>
               <li class="nav-header">New Owners</li>
-              <li><a href="#">Success</a></li>
-              <li><a href="#">Activity</a></li>
-              <li><a href="#">Volume</a></li>
+              <li><a href="/new-owner-success">Success</a></li>
+              <li><a href="/new-owner-activity">Activity</a></li>
+              <li><a href="/new-owner-volume">Volume</a></li>
               <li class="nav-header">Network Health</li>
-              <li><a href="#">Active Sitter Success</a></li>
-              <li><a href="#">Active Owner Success</a></li>
-              <li><a href="#">Active Member Ratios</a></li>
+              <li><a href="/active-sitter-success">Active Sitter Success</a></li>
+              <li><a href="/active-owner-success">Active Owner Success</a></li>
+              <li><a href="/active-member-ratio">Active Member Ratios</a></li>
             </ul>
           <!-- </div> -->
         </div><!--/span-->
-        
+   
         <div class="col-md-9">
+			<H1>{{ title }}</H1>
 
-				<H1>Network Health Dashboard</H1>
-
-				{% block app_content %}{% endblock %}
+			{% block app_content %}{% endblock %}
 		</div>
-
 	</div><!-- /row -->
-
   </div><!-- /container -->
 {% endblock %}
