@@ -1,9 +1,14 @@
 {% extends 'base.html' %}
 
 {% block app_content %}
+	
+	<p>The number of paid members of each membership type, as recorded at the end of each month</p>
+
+	<hr/>
 
 	<form action="/membership-growth">
-	<select name="country">
+	<label for="sel">Filter by country: </label>
+	<select name="country" id="sel">
 		{% for country in country_names %}
 			{% if country == current_country %}
 				<option selected value="{{ country }}">{{ country }}</option> 
@@ -14,6 +19,8 @@
 	</select>
 	<input type="submit">
 	</form>
+
+	<hr/>
 	
     <script src="http://cdn.pydata.org/bokeh/release/bokeh-0.12.14.min.js"></script>
     <script src="http://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.14.min.js"></script>

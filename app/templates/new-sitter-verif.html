@@ -2,11 +2,11 @@
 
 {% block app_content %}
 
-	<p>The number of Owners who are in the first three months of their membership, over time.</p>
+	<p>The percentage of Sitters who reach Standard Verification in the first month of their membership.</p>
 
 	<hr />
 
-	<form action="/new-owner-volume">
+	<form action="/new-sitter-verif">
 	<label for="sel">Filter by country: </label>
 	<select name="country">
 		{% for country in country_names %}

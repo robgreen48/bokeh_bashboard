@@ -133,6 +133,24 @@ def manipulate_sitters_apps(country):
     else:
         return apps, sitter_data[sitter_data.country_cat == country]
 
+def manipulate_sitter_verif(sitter_data):
+    st_verif = pd.read_csv('app/data_files/180313-standard-verif.csv', parse_dates=['standard_verif'])
+    sitter_verif = sitter_data.reset_index().merge(st_verif, how='left', on='user_id')
+
+    sitter_verif['verif_in_one_month'] = (sitter_verif.standard_verif - sitter_verif.fst_start_date) <= datetime.timedelta(days=30)
+
+    return sitter_verif
+
+def create_sitter_verif_source(data):
+    sampled_sitters = data.set_index('fst_start_date').loc[REPORT_START:REPORT_END].verif_in_one_month.resample('M').mean()
+
+    source = dict(
+        x=sampled_sitters.index,
+        y=sampled_sitters,
+        datestr=[d.strftime("%d-%m-%Y") for d in sampled_sitters.index])
+
+    return source
+
 def create_sitter_onboarding_source(data):
 
     sampled_sitters = data.loc[REPORT_START:REPORT_END].resample('M').agg({
@@ -206,6 +224,7 @@ def manipulate_owner_assignments(apps, country):
         return asgnmts, relevant_assignments, owners
     else:
         return asgnmts, relevant_assignments[relevant_assignments.country_cat == country], owners[owners.country_cat == country]
+
 
 def create_owner_onboarding_source(owner_data, assignment_data):
 
@@ -366,7 +385,7 @@ def membership_growth():
 
     # Set up layouts
     growth_inputs = row(a_number)
-    growth_layout = column(growth_inputs, growth_plot, width=1200)
+    growth_layout = column(growth_plot, growth_inputs, width=1200)
 
     script, div = components(growth_layout)
     return render_template("membership-growth.html",
@@ -427,7 +446,7 @@ def new_sitter_success():
     sitter_onboarding_source = ColumnDataSource(data=create_sitter_onboarding_source(onboarding_sitters))
     
     var_list = ['is_successful', 'confirmed_sits']
-    title_list = ['Active Sitter Success', 'Sits Per Sitter']
+    title_list = ['New Sitter Success', 'Sits Per New Sitter']
     axis_labels = ['Success rate', 'Sits']
     number_formats = ['{0%}', '{0.00}']
     is_percents = [True, False]
@@ -506,6 +525,39 @@ def new_sitter_volume():
     script, div = components(sitter_onb_layout)
     return render_template("new-sitter-volume.html",
         title='New Sitter Volume',
+        script=script,
+        div=div,
+        country_names=COUNTRY_OPTIONS,
+        current_country=current_country)
+
+# New sitter activity page, no args
+@app.route('/new-sitter-verif')
+@auth.login_required
+def new_sitter_verif():
+
+    # Look for country in the URL
+    current_country = request.args.get("country")
+    if current_country == None:
+        current_country = "All"
+
+    # Create sitter onboarding datasource and plots
+    apps, onboarding_sitters = manipulate_sitters_apps(current_country)
+    sitters_with_verif = manipulate_sitter_verif(onboarding_sitters)
+    sitter_verif_source = create_sitter_verif_source(sitters_with_verif)
+
+    var_list = ['y']
+    title_list = ['New Sitter Verification']
+    axis_labels = ['Percent Verified']
+    number_formats = ['{0%}']
+    is_percents = [True]
+
+    plots = visualise(sitter_verif_source, var_list, title_list, axis_labels, number_formats, is_percents)
+
+    sitter_v_layout = column(plots)
+
+    script, div = components(sitter_v_layout)
+    return render_template("new-sitter-verif.html",
+        title='New Sitter Verification',
         script=script,
         div=div,
         country_names=COUNTRY_OPTIONS,

@@ -2,7 +2,12 @@
 
 {% block app_content %}
 
+	<p>The percentage of Sitters that are confirmed on a sit during the first three months of their membership, and the average number of sits for each of these new Sitters.</p>
+
+	<hr />
+
 	<form action="/new-sitter-success">
+	<label for="sel">Filter by country: </label>
 	<select name="country">
 		{% for country in country_names %}
 			{% if country == current_country %}
@@ -14,6 +19,8 @@
 	</select>
 	<input type="submit">
 	</form>
+
+	<hr />
 	
     <script src="http://cdn.pydata.org/bokeh/release/bokeh-0.12.14.min.js"></script>
     <script src="http://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.14.min.js"></script>

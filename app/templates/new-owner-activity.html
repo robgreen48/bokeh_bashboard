@@ -2,7 +2,12 @@
 
 {% block app_content %}
 
+	<p>The number of assignments listed by Owners who are in the first three months of their membership, and the percentage of Owners who list 0 assignments during the first three months of their membership.</p>
+
+	<hr />
+
 	<form action="/new-owner-activity">
+	<label for="sel">Filter by country: </label>
 	<select name="country">
 		{% for country in country_names %}
 			{% if country == current_country %}
@@ -14,6 +19,8 @@
 	</select>
 	<input type="submit">
 	</form>
+
+	<hr />
 	
     <script src="http://cdn.pydata.org/bokeh/release/bokeh-0.12.14.min.js"></script>
     <script src="http://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.14.min.js"></script>
